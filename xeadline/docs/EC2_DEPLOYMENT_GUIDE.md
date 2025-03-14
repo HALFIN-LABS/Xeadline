@@ -74,7 +74,7 @@ For Windows (using PuTTY):
 3. Add/update the following records:
    - **A Record**: @ → Your Elastic IP address
    - **A Record**: www → Your Elastic IP address
-   - **A Record**: relay → Your Elastic IP address (for the Nostr relay)
+   - **A Record**: relay → Elastic IP address of your separate relay server
 4. Save changes (DNS propagation may take up to 48 hours)
 
 ### Using Route 53 (Optional)
@@ -201,8 +201,8 @@ su - deploy
 cd ~/apps
 
 # Clone the repository
-git clone https://github.com/yourusername/xeadline.git
-cd xeadline
+git clone https://github.com/yourusername/Xeadline.git
+cd Xeadline/xeadline
 ```
 
 #### Option 2: Deploy as Ubuntu User (Simpler for Development)
@@ -215,8 +215,8 @@ mkdir -p ~/apps
 cd ~/apps
 
 # Clone the repository
-git clone https://github.com/yourusername/xeadline.git
-cd xeadline
+git clone https://github.com/yourusername/Xeadline.git
+cd Xeadline/xeadline
 
 # Install dependencies
 npm install
@@ -229,7 +229,11 @@ DATABASE_URL=postgresql://xeadlineuser:your_secure_password@localhost:5432/xeadl
 # Application settings
 NEXT_PUBLIC_SITE_URL=https://xeadline.com
 NEXT_PUBLIC_API_URL=https://xeadline.com/api
-NEXT_PUBLIC_RELAY_URL=wss://relay.xeadline.com
+NEXT_PUBLIC_RELAY_URL=wss://relay.xeadline.com  # Points to your separate relay server
+
+# Note: We're using the non-www version as the canonical URL.
+# The Nginx configuration will handle both www and non-www versions,
+# redirecting www.xeadline.com to xeadline.com for consistency.
 
 # Add any other environment variables your application needs
 EOL
@@ -250,6 +254,7 @@ module.exports = {
       script: 'npm',
       args: 'start',
       // Use the correct path based on your deployment option
+      // This should point to the xeadline application directory
       cwd: '${PWD}',
       env: {
         NODE_ENV: 'production',
@@ -271,15 +276,17 @@ pm2 start ecosystem.config.js
 pm2 save
 
 # Set up PM2 to start on system boot
-# This will output a command that you need to run with sudo
 pm2 startup
 
-# Run the command that was output by the previous command
-# It will look something like:
-# sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ubuntu --hp /home/ubuntu
+# This will output a command that you need to run with sudo
+# Copy and paste the exact command that PM2 outputs
+# It will look something like this:
+sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u ubuntu --hp /home/ubuntu
 ```
 
-> **Note**: If you're using the deploy user, make sure you're logged in as that user when running the PM2 commands, or adjust the startup command accordingly.
+> **Important**: Make sure to copy and paste the exact command that PM2 outputs, not the example above, as the paths may be different on your system.
+
+> **Note**: If you're using the deploy user (Option 1), make sure you're logged in as that user when running the PM2 commands. The startup command will be different and will reference the deploy user instead of ubuntu (e.g., `-u deploy --hp /home/deploy`).
 
 ## 7. Web Server Configuration
 
@@ -295,9 +302,17 @@ sudo nano /etc/nginx/sites-available/xeadline
 Paste this configuration:
 
 ```nginx
+# Redirect www to non-www (canonical URL)
 server {
     listen 80;
-    server_name xeadline.com www.xeadline.com;
+    server_name www.xeadline.com;
+    return 301 $scheme://xeadline.com$request_uri;
+}
+
+# Main server block for xeadline.com
+server {
+    listen 80;
+    server_name xeadline.com;
 
     location / {
         proxy_pass http://localhost:3000;
@@ -327,20 +342,8 @@ server {
     # Add additional location blocks for other endpoints as needed
 }
 
-# For the relay subdomain (if you're hosting the relay on the same server)
-server {
-    listen 80;
-    server_name relay.xeadline.com;
-
-    location / {
-        proxy_pass http://localhost:8008;  # Adjust port if your relay uses a different one
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
+# Note: The relay is hosted on a separate EC2 instance
+# and has its own SSL certificate
 ```
 
 Enable the configuration:
@@ -366,13 +369,17 @@ sudo systemctl reload nginx
 sudo apt install -y certbot python3-certbot-nginx
 
 # Obtain certificates for your domains
-sudo certbot --nginx -d xeadline.com -d www.xeadline.com -d relay.xeadline.com
+sudo certbot --nginx -d xeadline.com -d www.xeadline.com
 
 # Follow the prompts to complete the process
 # Select option 2 to redirect all HTTP traffic to HTTPS
 ```
 
-Certbot will automatically update your Nginx configuration to use SSL. It will also set up a cron job to renew the certificates before they expire.
+Certbot will automatically update your Nginx configuration to use SSL. It will maintain the www to non-www redirect while adding SSL support for both domains. It will also set up a cron job to renew the certificates before they expire.
+
+> **Note**: After running Certbot, verify that the www to non-www redirect still works properly with HTTPS. If not, you may need to manually adjust the Nginx configuration to ensure proper redirection.
+
+> **Important**: The relay subdomain (relay.xeadline.com) is hosted on a separate EC2 instance with its own SSL certificate, so it's not included in the Certbot command for this server.
 
 ## 9. NIP-05 Implementation
 
@@ -587,7 +594,7 @@ chmod +x ~/backup-db.sh
 
 1. **Application not starting**:
    - Check logs: `pm2 logs xeadline`
-   - Verify environment variables: `cat ~/apps/xeadline/.env.local` (or `/home/deploy/apps/xeadline/.env.local` if using deploy user)
+   - Verify environment variables: `cat ~/apps/Xeadline/xeadline/.env.local` (or `/home/deploy/apps/Xeadline/xeadline/.env.local` if using deploy user)
    - Check Node.js version: `node -v`
 
 2. **Database connection issues**:

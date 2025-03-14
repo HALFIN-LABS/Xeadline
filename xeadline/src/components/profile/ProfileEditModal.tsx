@@ -33,6 +33,10 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
   const [about, setAbout] = useState(profile?.about || '');
   const [website, setWebsite] = useState(profile?.website || '');
   const [nip05, setNip05] = useState(profile?.nip05 || '');
+  const [username, setUsername] = useState('');
+  const [usernameAvailable, setUsernameAvailable] = useState(false);
+  const [usernameChecking, setUsernameChecking] = useState(false);
+  const [usernameError, setUsernameError] = useState('');
   const [lud16, setLud16] = useState(profile?.lud16 || '');
   const [picture, setPicture] = useState(profile?.picture || '');
   const [banner, setBanner] = useState(profile?.banner || '');
@@ -87,6 +91,47 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
       setPicture(robohashUrl);
     }
   };
+
+  // Extract username from NIP-05 identifier on component mount
+  React.useEffect(() => {
+    if (nip05) {
+      const parts = nip05.split('@');
+      if (parts.length === 2 && parts[1] === 'xeadline.com') {
+        setUsername(parts[0]);
+      }
+    }
+  }, [nip05]);
+
+  const checkUsernameAvailability = async (value: string) => {
+    if (!value || value.length < 3) {
+      setUsernameAvailable(false);
+      setUsernameError('Username must be at least 3 characters');
+      return;
+    }
+    
+    if (!/^[a-z0-9_]{3,30}$/.test(value)) {
+      setUsernameAvailable(false);
+      setUsernameError('Username can only contain letters, numbers, and underscores');
+      return;
+    }
+    
+    setUsernameChecking(true);
+    try {
+      const response = await fetch(`/api/nip05/check/${value}`);
+      const data = await response.json();
+      setUsernameAvailable(data.available);
+      if (!data.available) {
+        setUsernameError('Username already taken');
+      } else {
+        setUsernameError('');
+      }
+    } catch (error) {
+      console.error('Error checking username:', error);
+      setUsernameError('Error checking username availability');
+    } finally {
+      setUsernameChecking(false);
+    }
+  };
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,13 +141,42 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
       return;
     }
     
+    // Handle Xeadline NIP-05 username claim if available
+    let finalNip05 = nip05;
+    if (username && usernameAvailable) {
+      try {
+        const response = await fetch('/api/nip05/claim', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username,
+            pubkey: currentUser.publicKey,
+          }),
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to claim username');
+        }
+        
+        // Update NIP-05 with the claimed username
+        finalNip05 = `${username}@xeadline.com`;
+      } catch (error) {
+        console.error('Error claiming username:', error);
+        // Continue with profile update even if username claim fails
+      }
+    }
+    
     // Create the metadata object
     const metadata = {
       name,
       displayName,
       about,
       website,
-      nip05,
+      nip05: finalNip05,
       lud16,
       picture,
       banner
@@ -315,29 +389,70 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
           <label htmlFor="nip05" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             NIP-05 Identifier
           </label>
-          <input
-            id="nip05"
-            type="text"
-            value={nip05}
-            onChange={(e) => setNip05(e.target.value)}
-            placeholder="you@example.com"
-            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 shadow-sm focus:border-bottle-green focus:ring-bottle-green text-base py-2 px-3"
-          />
-          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            <p>
-              Used for verification. A verified NIP-05 identifier will display a blue checkmark next to your name.
+          
+          {/* Xeadline NIP-05 Username */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Xeadline Username
+            </label>
+            <div className="flex items-center">
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => {
+                  const value = e.target.value.toLowerCase();
+                  setUsername(value);
+                  checkUsernameAvailability(value);
+                }}
+                className="mr-2 p-2 border rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 shadow-sm focus:border-bottle-green focus:ring-bottle-green"
+                placeholder="username"
+              />
+              <span>@xeadline.com</span>
+            </div>
+            {usernameChecking && (
+              <p className="text-sm mt-1 text-gray-500">Checking availability...</p>
+            )}
+            {username && !usernameChecking && (
+              <p className={`text-sm mt-1 ${usernameAvailable ? 'text-green-500' : 'text-red-500'}`}>
+                {usernameAvailable
+                  ? 'Username available!'
+                  : usernameError || 'Username unavailable'}
+              </p>
+            )}
+            <p className="text-xs mt-2 text-gray-500 dark:text-gray-400">
+              Claim a username on xeadline.com for NIP-05 verification. This will be automatically verified.
             </p>
-            <p className="mt-1">
-              To set up NIP-05 verification:
-            </p>
-            <ol className="list-decimal ml-4 mt-1 space-y-1">
-              <li>Enter your identifier in the format <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">name@yourdomain.com</code></li>
-              <li>Create a <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/.well-known/nostr.json</code> file on your domain</li>
-              <li>Add your public key to the file (see <a href="https://github.com/nostr-protocol/nips/blob/master/05.md" target="_blank" rel="noopener noreferrer" className="text-bottle-green hover:underline">NIP-05 spec</a>)</li>
-            </ol>
-            <p className="mt-1">
-              Don't have a domain? You can use services like <a href="https://nostr.directory" target="_blank" rel="noopener noreferrer" className="text-bottle-green hover:underline">nostr.directory</a> to get a free NIP-05 identifier.
-            </p>
+          </div>
+          
+          {/* External NIP-05 */}
+          <div className="mt-4">
+            <label htmlFor="nip05" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              External NIP-05 Identifier (Optional)
+            </label>
+            <input
+              id="nip05"
+              type="text"
+              value={nip05}
+              onChange={(e) => setNip05(e.target.value)}
+              placeholder="you@example.com"
+              className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 shadow-sm focus:border-bottle-green focus:ring-bottle-green text-base py-2 px-3"
+            />
+            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              <p>
+                Used for verification. A verified NIP-05 identifier will display a blue checkmark next to your name.
+              </p>
+              <p className="mt-1">
+                To set up external NIP-05 verification:
+              </p>
+              <ol className="list-decimal ml-4 mt-1 space-y-1">
+                <li>Enter your identifier in the format <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">name@yourdomain.com</code></li>
+                <li>Create a <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/.well-known/nostr.json</code> file on your domain</li>
+                <li>Add your public key to the file (see <a href="https://github.com/nostr-protocol/nips/blob/master/05.md" target="_blank" rel="noopener noreferrer" className="text-bottle-green hover:underline">NIP-05 spec</a>)</li>
+              </ol>
+              <p className="mt-1">
+                Don't have a domain? You can use services like <a href="https://nostr.directory" target="_blank" rel="noopener noreferrer" className="text-bottle-green hover:underline">nostr.directory</a> to get a free NIP-05 identifier.
+              </p>
+            </div>
           </div>
         </div>
         
