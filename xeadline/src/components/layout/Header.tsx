@@ -88,6 +88,7 @@ export default function Header() {
           <NavLink href="/" active={pathname === '/'}>Home</NavLink>
           <NavLink href="/popular" active={pathname === '/popular'}>Popular</NavLink>
           <NavLink href="/all" active={pathname === '/all'}>All</NavLink>
+          <NavLink href="/community/discover" active={pathname ? pathname.startsWith('/community') : false}>Communities</NavLink>
         </nav>
 
         {/* Search bar */}
@@ -198,6 +199,7 @@ export default function Header() {
               <MobileNavLink href="/" active={pathname === '/'}>Home</MobileNavLink>
               <MobileNavLink href="/popular" active={pathname === '/popular'}>Popular</MobileNavLink>
               <MobileNavLink href="/all" active={pathname === '/all'}>All</MobileNavLink>
+              <MobileNavLink href="/community/discover" active={pathname ? pathname.startsWith('/community') : false}>Communities</MobileNavLink>
               <div className="pt-2 border-t border-gray-200 dark:border-gray-800 flex space-x-2">
                 {isAuthenticated ? (
                   <button

@@ -19,7 +19,8 @@ import ProfileEditModal from '@/components/profile/ProfileEditModal';
 
 export default function ProfilePage() {
   const dispatch = useAppDispatch();
-  const { pubkey } = useParams();
+  const params = useParams();
+  const pubkey = params?.pubkey as string;
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   
   const profile = useAppSelector(selectViewingProfile);

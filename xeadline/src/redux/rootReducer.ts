@@ -4,6 +4,7 @@ import nostrReducer from './slices/nostrSlice'
 import testReducer from './slices/testSlice'
 import authReducer from './slices/authSlice'
 import profileReducer from './slices/profileSlice'
+import communityReducer from './slices/communitySlice'
 
 export const rootReducer = combineReducers({
   // Add reducers
@@ -11,4 +12,5 @@ export const rootReducer = combineReducers({
   test: testReducer,
   auth: authReducer,
   profile: profileReducer,
+  community: communityReducer,
 })

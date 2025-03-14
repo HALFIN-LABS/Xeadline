@@ -11,23 +11,23 @@ interface MainLayoutProps {
 }
 
 export default function MainLayout({ children }: MainLayoutProps) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const pathname = usePathname();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const pathname = usePathname()
   
   // Only show right sidebar on topic pages
-  const showRightSidebar = pathname.startsWith('/topic/');
+  const showRightSidebar = pathname?.startsWith('/topic/') || false
   
   // Close sidebar when screen size changes to desktop
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth >= 768) {
-        setIsSidebarOpen(false);
+        setIsSidebarOpen(false)
       }
-    };
+    }
     
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -61,5 +61,5 @@ export default function MainLayout({ children }: MainLayoutProps) {
         {showRightSidebar && <RightSidebar />}
       </div>
     </div>
-  );
+  )
 }
