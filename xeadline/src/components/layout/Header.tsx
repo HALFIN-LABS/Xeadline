@@ -47,8 +47,9 @@ export default function Header() {
   };
   
   const handleLogout = () => {
-    logoutUser(dispatch);
+    logoutUser(dispatch, true); // Pass true to clear all stored keys
     setShowUserMenu(false);
+    router.push('/'); // Redirect to home screen
   };
   
   const openAuthModal = (mode: AuthMode) => {

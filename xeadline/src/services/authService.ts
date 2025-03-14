@@ -238,20 +238,23 @@ export async function generateKeyAndLogin(
 
 /**
  * Logs out the current user
- * 
+ *
  * @param dispatch - Redux dispatch function
- * @param clearKeys - Whether to clear stored keys
+ * @param clearKeys - Whether to clear stored keys (defaults to true for security)
  */
-export function logoutUser(dispatch: AppDispatch, clearKeys: boolean = false) {
+export function logoutUser(dispatch: AppDispatch, clearKeys: boolean = true) {
   // Clear session
   clearSession();
   
-  // Clear stored keys if requested
+  // Clear stored keys if requested (default is true)
   if (clearKeys) {
     clearStoredKeys();
   }
   
+  // Dispatch logout action to update Redux state
   dispatch(logout());
+  
+  console.log('User logged out successfully');
 }
 
 /**

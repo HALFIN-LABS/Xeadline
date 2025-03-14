@@ -5,13 +5,13 @@
  * It supports both direct key generation and interaction with Nostr browser extensions.
  */
 
-import { generateSecretKey, getPublicKey } from 'nostr-tools';
-import { encrypt, decrypt } from './encryption';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
+import { generateSecretKey, getPublicKey } from 'nostr-tools'
+import { encrypt, decrypt } from './encryption'
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils'
 
 // Local storage keys
-const ENCRYPTED_PRIVATE_KEY = 'xeadline_encrypted_private_key';
-const PUBLIC_KEY = 'xeadline_public_key';
+const ENCRYPTED_PRIVATE_KEY = 'xeadline_encrypted_private_key'
+const PUBLIC_KEY = 'xeadline_public_key'
 
 /**
  * Generates a new Nostr key pair
@@ -19,11 +19,11 @@ const PUBLIC_KEY = 'xeadline_public_key';
  * @returns An object containing the private and public keys
  */
 export function generateKeyPair() {
-  const privateKeyBytes = generateSecretKey();
-  const privateKey = bytesToHex(privateKeyBytes);
-  const publicKey = getPublicKey(privateKeyBytes);
+  const privateKeyBytes = generateSecretKey()
+  const privateKey = bytesToHex(privateKeyBytes)
+  const publicKey = getPublicKey(privateKeyBytes)
   
-  return { privateKey, publicKey };
+  return { privateKey, publicKey }
 }
 
 /**
@@ -38,17 +38,17 @@ export function validatePrivateKey(key: string): string | null {
     if (key.startsWith('nsec')) {
       // This is a simplified example - in a real app, you'd decode the bech32 nsec
       // For now, we'll just return a placeholder
-      return 'placeholder_for_decoded_nsec';
+      return 'placeholder_for_decoded_nsec'
     }
     
     // Handle hex format (64 characters)
     if (/^[0-9a-f]{64}$/i.test(key)) {
-      return key.toLowerCase();
+      return key.toLowerCase()
     }
     
-    return null;
+    return null
   } catch (error) {
-    return null;
+    return null
   }
 }
 
@@ -58,18 +58,18 @@ export function validatePrivateKey(key: string): string | null {
  * @returns A promise that resolves to true if an extension is available
  */
 export async function checkExtensionAvailability(): Promise<boolean> {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === 'undefined') return false
   
   try {
     // Check if window.nostr exists (standard Nostr extension API)
     if (window.nostr) {
       // Try to get the public key to verify the extension is working
-      const publicKey = await window.nostr.getPublicKey();
-      return !!publicKey;
+      const publicKey = await window.nostr.getPublicKey()
+      return !!publicKey
     }
-    return false;
+    return false
   } catch (error) {
-    return false;
+    return false
   }
 }
 
@@ -79,15 +79,15 @@ export async function checkExtensionAvailability(): Promise<boolean> {
  * @returns A promise that resolves to the public key if available
  */
 export async function getExtensionPublicKey(): Promise<string | null> {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === 'undefined') return null
   
   try {
     if (window.nostr) {
-      return await window.nostr.getPublicKey();
+      return await window.nostr.getPublicKey()
     }
-    return null;
+    return null
   } catch (error) {
-    return null;
+    return null
   }
 }
 
@@ -97,13 +97,16 @@ export async function getExtensionPublicKey(): Promise<string | null> {
  * @param privateKey - The private key to store
  * @param password - The password to encrypt with
  */
-export async function storeEncryptedPrivateKey(privateKey: string, password: string): Promise<void> {
-  const encryptedKey = await encrypt(privateKey, password);
-  localStorage.setItem(ENCRYPTED_PRIVATE_KEY, encryptedKey);
+export async function storeEncryptedPrivateKey(
+  privateKey: string,
+  password: string
+): Promise<void> {
+  const encryptedKey = await encrypt(privateKey, password)
+  localStorage.setItem(ENCRYPTED_PRIVATE_KEY, encryptedKey)
   
   // Also store the public key for convenience
-  const publicKey = getPublicKey(hexToBytes(privateKey));
-  localStorage.setItem(PUBLIC_KEY, publicKey);
+  const publicKey = getPublicKey(hexToBytes(privateKey))
+  localStorage.setItem(PUBLIC_KEY, publicKey)
 }
 
 /**
@@ -113,13 +116,13 @@ export async function storeEncryptedPrivateKey(privateKey: string, password: str
  * @returns The decrypted private key if successful
  */
 export async function retrievePrivateKey(password: string): Promise<string | null> {
-  const encryptedKey = localStorage.getItem(ENCRYPTED_PRIVATE_KEY);
-  if (!encryptedKey) return null;
+  const encryptedKey = localStorage.getItem(ENCRYPTED_PRIVATE_KEY)
+  if (!encryptedKey) return null
   
   try {
-    return await decrypt(encryptedKey, password);
+    return await decrypt(encryptedKey, password)
   } catch (error) {
-    return null;
+    return null
   }
 }
 
@@ -129,23 +132,37 @@ export async function retrievePrivateKey(password: string): Promise<string | nul
  * @returns The public key if available
  */
 export function retrievePublicKey(): string | null {
-  return localStorage.getItem(PUBLIC_KEY);
+  return localStorage.getItem(PUBLIC_KEY)
 }
 
 /**
- * Clears stored keys from local storage
+ * Clears stored keys and all related user data from local storage and session storage
  */
 export function clearStoredKeys(): void {
-  localStorage.removeItem(ENCRYPTED_PRIVATE_KEY);
-  localStorage.removeItem(PUBLIC_KEY);
+  // Clear specific key-related items
+  localStorage.removeItem(ENCRYPTED_PRIVATE_KEY)
+  localStorage.removeItem(PUBLIC_KEY)
+  
+  // Clear session storage
+  sessionStorage.removeItem('xeadline_session')
+  
+  // Clear any other potential user-related data
+  // This ensures we don't leave any user data behind
+  localStorage.removeItem('xeadline_user_preferences')
+  localStorage.removeItem('xeadline_theme')
+  
+  // Clear any cached profile data
+  localStorage.removeItem('xeadline_profile_cache')
+  
+  console.log('All stored keys and user data cleared')
 }
 
 // Add TypeScript declaration for window.nostr
 declare global {
   interface Window {
     nostr?: {
-      getPublicKey(): Promise<string>;
-      signEvent(event: any): Promise<any>;
-    };
+      getPublicKey(): Promise<string>
+      signEvent(event: any): Promise<any>
+    }
   }
 }
