@@ -23,6 +23,15 @@ const nextConfig = {
     ],
     domains: ['robohash.org'], // Keep for backward compatibility
   },
+  // Add rewrites for .well-known paths
+  async rewrites() {
+    return [
+      {
+        source: '/.well-known/nostr.json',
+        destination: '/api/.well-known/nostr.json',
+      },
+    ];
+  },
 }
 
 module.exports = nextConfig
