@@ -1,0 +1,195 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-rgb: 255, 255, 255;
+  --bottle-green: 0, 106, 78;
+  --text-light: 75, 85, 99; /* gray-600 for better contrast in light mode */
+  --text-dark: 229, 231, 235; /* gray-200 for better contrast in dark mode */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-rgb: 10, 10, 10;
+  }
+}
+
+/* Ensure text is always visible in light mode */
+.bg-blue-100, .bg-blue-200, .bg-blue-300 {
+  color: rgb(31, 41, 55) !important; /* dark gray text for light backgrounds */
+}
+
+/* Better contrast for settings tabs */
+.text-gray-500 {
+  color: rgb(75, 85, 99) !important; /* gray-600 for better contrast */
+}
+
+/* Ensure light mode has proper contrast */
+html:not(.dark) .text-gray-400,
+html:not(.dark) .text-gray-300,
+html:not(.dark) .text-gray-200,
+html:not(.dark) .text-gray-100,
+html:not(.dark) .text-white {
+  color: rgb(75, 85, 99) !important; /* gray-600 for better contrast in light mode */
+}
+
+/* Ensure dark mode has proper contrast */
+html.dark .text-gray-500,
+html.dark .text-gray-600,
+html.dark .text-gray-700,
+html.dark .text-gray-800,
+html.dark .text-gray-900,
+html.dark .text-black {
+  color: rgb(209, 213, 219) !important; /* gray-300 for better contrast in dark mode */
+}
+
+/* Fix for white text in light mode */
+html:not(.dark) .text-white {
+  color: rgb(31, 41, 55) !important; /* dark gray (gray-800) for light mode */
+}
+
+/* Fix for buttons with white text in light mode */
+html:not(.dark) button.text-white,
+html:not(.dark) .btn.text-white,
+html:not(.dark) a.text-white {
+  color: rgb(31, 41, 55) !important; /* dark gray (gray-800) for light mode */
+}
+
+/* Exception for buttons with colored backgrounds */
+html:not(.dark) .bg-bottle-green .text-white,
+html:not(.dark) .bg-blue-500 .text-white,
+html:not(.dark) .bg-red-500 .text-white,
+html:not(.dark) .bg-gray-800 .text-white,
+html:not(.dark) .bg-gray-900 .text-white {
+  color: white !important; /* Keep white text on colored backgrounds */
+}
+
+/* Modal animation */
+@keyframes modalAppear {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) translate(calc(-50vw + 100px), calc(50vh - 100px));
+  }
+  50% {
+    opacity: 1;
+    transform: scale(0.9) translate(0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translate(0, 0);
+  }
+}
+
+.animate-modal-appear {
+  animation: modalAppear 0.3s ease-out forwards;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background-color: rgb(var(--background-rgb));
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-md font-medium transition-colors;
+  }
+
+  .btn-primary {
+    @apply bg-bottle-green text-white hover:bg-bottle-green-700;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600;
+  }
+
+  .card {
+    @apply bg-white dark:bg-gray-800 rounded-lg shadow-md p-4;
+  }
+  
+  /* Compact mode styles */
+  .compact-mode .card {
+    @apply p-3;
+  }
+  
+  .compact-mode h1 {
+    @apply text-xl;
+  }
+  
+  .compact-mode h2 {
+    @apply text-lg;
+  }
+  
+  .compact-mode h3 {
+    @apply text-base;
+  }
+  
+  .compact-mode p {
+    @apply my-1;
+  }
+  
+  .compact-mode .mb-4 {
+    @apply mb-2;
+  }
+  
+  .compact-mode .mb-6 {
+    @apply mb-3;
+  }
+  
+  .compact-mode .p-4 {
+    @apply p-2;
+  }
+  
+  .compact-mode .py-4 {
+    @apply py-2;
+  }
+  
+  .compact-mode .py-6 {
+    @apply py-3;
+  }
+  
+  .compact-mode .space-y-4 {
+    @apply space-y-2;
+  }
+  
+  .compact-mode .gap-4 {
+    @apply gap-2;
+  }
+  
+  /* Custom scrollbar that's always visible */
+  .custom-scrollbar {
+    overflow-y: scroll !important; /* Force scrollbar to always be visible */
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(156, 163, 175, 0.7) rgba(229, 231, 235, 0.7) !important;
+    -ms-overflow-style: scrollbar !important; /* For IE and Edge */
+  }
+  
+  /* For WebKit browsers (Chrome, Safari, etc.) */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 10px !important; /* Slightly wider for better visibility */
+    background-color: rgba(229, 231, 235, 0.7) !important;
+    display: block !important; /* Force display */
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.7) !important;
+    border-radius: 4px !important;
+    border: 2px solid rgba(229, 231, 235, 0.7) !important; /* Border for better visibility */
+  }
+  
+  /* Dark mode scrollbar */
+  .dark .custom-scrollbar {
+    scrollbar-color: rgba(107, 114, 128, 0.7) rgba(55, 65, 81, 0.7) !important;
+  }
+  
+  .dark .custom-scrollbar::-webkit-scrollbar {
+    background-color: rgba(55, 65, 81, 0.7) !important;
+  }
+  
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(107, 114, 128, 0.7) !important;
+    border: 2px solid rgba(55, 65, 81, 0.7) !important;
+  }
+}
