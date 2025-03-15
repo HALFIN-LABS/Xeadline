@@ -37,12 +37,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ErrorHandler />
           <ErrorBoundary>
             <BrowserCheck>
-              <NostrInitializer />
+              {/* Temporarily disabled NostrInitializer to fix client-side error */}
+              {/* <NostrInitializer /> */}
               <AuthInitializer />
               <MainLayout>
                 {children}
               </MainLayout>
-              <ConnectionStatus />
+              {/* Temporarily disabled ConnectionStatus to fix client-side error */}
+              {/* <ConnectionStatus /> */}
             </BrowserCheck>
           </ErrorBoundary>
         </Providers>
