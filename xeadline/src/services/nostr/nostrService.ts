@@ -184,97 +184,130 @@ class NostrService {
     try {
       console.log(`Connecting to relays: ${this.relayUrls.join(', ')}`);
       
-      // Force WebSocket protocol for Vercel deployments
+      // Ensure all relay URLs use secure WebSocket protocol
       const secureRelayUrls = this.relayUrls.map(url => {
-        // Ensure all relay URLs use secure WebSocket protocol
         if (url.startsWith('ws:')) {
           return url.replace('ws:', 'wss:');
         }
         return url;
       });
       
-      console.log(`Using secure relay URLs: ${secureRelayUrls.join(', ')}`);
-      
-      // For Vercel deployments, we'll simulate a successful connection
-      // This is a workaround for WebSocket connection issues in serverless environments
-      if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
-        console.log('Detected Vercel deployment, using simulated connection');
-        
-        // Simulate a delay for connection
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Use the first two relays as "connected"
-        const simulatedConnectedRelays = secureRelayUrls.slice(0, 2);
-        
-        // Update state to connected
-        this.updateState({
-          status: 'connected',
-          connectedRelays: simulatedConnectedRelays,
-          error: null
-        });
-        
-        console.log(`Simulated connection to ${simulatedConnectedRelays.length} relays for Vercel environment`);
-        return;
-      }
-      
-      // For non-Vercel environments, proceed with normal connection logic
-      // Connect to all relays with a timeout
+      // Connect to all relays with progressive timeouts
       const connectedRelays: string[] = [];
-      const connectionPromises = secureRelayUrls.map(async (url) => {
+      
+      // First try to connect to primary relays (first 3) with shorter timeout
+      const primaryRelays = secureRelayUrls.slice(0, 3);
+      console.log(`Attempting to connect to primary relays: ${primaryRelays.join(', ')}`);
+      
+      const primaryConnectionPromises = primaryRelays.map(async (url) => {
         try {
-          // Create a promise that will reject after timeout
-          const timeoutPromise = new Promise<null>((_, reject) => {
-            setTimeout(() => reject(new Error(`Connection to ${url} timed out`)), 15000);
-          });
+          const relay = await Promise.race([
+            this.pool.ensureRelay(url),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error(`Connection to ${url} timed out`)), 10000)
+            )
+          ]);
           
-          // Create a promise for the relay connection
-          const connectionPromise = this.pool.ensureRelay(url).then(relay => {
-            console.log('Connected to relay:', url);
-            connectedRelays.push(url);
-            return relay;
-          });
-          
-          // Race the connection against the timeout
-          return await Promise.race([connectionPromise, timeoutPromise]);
+          console.log('Connected to primary relay:', url);
+          connectedRelays.push(url);
+          return relay;
         } catch (err) {
-          console.error(`Failed to connect to relay ${url}:`, err);
+          console.error(`Failed to connect to primary relay ${url}:`, err);
           return null;
         }
       });
       
-      // Wait for all connection attempts to complete
-      await Promise.allSettled(connectionPromises);
+      // Wait for primary connections to complete
+      await Promise.allSettled(primaryConnectionPromises);
       
-      // Consider connection successful if we connect to at least one relay
+      // If we connected to at least one primary relay, consider it a success
       if (connectedRelays.length > 0) {
-        // Update state to connected
+        console.log(`Connected to ${connectedRelays.length} primary relays, proceeding with remaining relays`);
+        
+        // Update state to connected early to provide feedback
         this.updateState({
           status: 'connected',
-          connectedRelays,
+          connectedRelays: [...connectedRelays],
           error: null
         });
         
-        console.log(`Successfully connected to ${connectedRelays.length}/${secureRelayUrls.length} relays`);
-      } else {
-        // Try to connect to at least one relay with a longer timeout
-        console.log('Retrying connection to first relay with longer timeout...');
-        try {
-          const firstRelay = await this.pool.ensureRelay(secureRelayUrls[0], { connectionTimeout: 30000 });
-          console.log('Connected to relay:', secureRelayUrls[0]);
-          connectedRelays.push(secureRelayUrls[0]);
+        // Try to connect to remaining relays in the background
+        const remainingRelays = secureRelayUrls.slice(3);
+        if (remainingRelays.length > 0) {
+          console.log(`Attempting to connect to remaining relays: ${remainingRelays.join(', ')}`);
           
-          this.updateState({
-            status: 'connected',
-            connectedRelays,
-            error: null
+          // Connect to remaining relays with longer timeout
+          const remainingConnectionPromises = remainingRelays.map(async (url) => {
+            try {
+              const relay = await Promise.race([
+                this.pool.ensureRelay(url),
+                new Promise<never>((_, reject) =>
+                  setTimeout(() => reject(new Error(`Connection to ${url} timed out`)), 20000)
+                )
+              ]);
+              
+              console.log('Connected to additional relay:', url);
+              connectedRelays.push(url);
+              
+              // Update state with new connected relay
+              this.updateState({
+                status: 'connected',
+                connectedRelays: [...connectedRelays],
+                error: null
+              });
+              
+              return relay;
+            } catch (err) {
+              console.error(`Failed to connect to additional relay ${url}:`, err);
+              return null;
+            }
           });
           
-          console.log(`Successfully connected to ${connectedRelays.length}/${secureRelayUrls.length} relays after retry`);
-        } catch (retryError) {
-          console.error('Retry failed:', retryError);
-          throw new Error('Failed to connect to any relays, even after retry');
+          // Process remaining connections in the background
+          Promise.allSettled(remainingConnectionPromises).then(() => {
+            console.log(`Connection process complete. Connected to ${connectedRelays.length}/${secureRelayUrls.length} relays`);
+          });
+        }
+      } else {
+        // No primary relays connected, try all relays with longer timeout
+        console.log('No primary relays connected. Trying all relays with longer timeout...');
+        
+        const fallbackConnectionPromises = secureRelayUrls.map(async (url) => {
+          try {
+            const relay = await Promise.race([
+              this.pool.ensureRelay(url, { connectionTimeout: 30000 }),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error(`Fallback connection to ${url} timed out`)), 30000)
+              )
+            ]);
+            
+            console.log('Connected to relay in fallback mode:', url);
+            connectedRelays.push(url);
+            
+            // Update state with each new connected relay
+            this.updateState({
+              status: 'connected',
+              connectedRelays: [...connectedRelays],
+              error: null
+            });
+            
+            return relay;
+          } catch (err) {
+            console.error(`Failed to connect to relay ${url} in fallback mode:`, err);
+            return null;
+          }
+        });
+        
+        // Wait for at least one connection to succeed
+        const results = await Promise.allSettled(fallbackConnectionPromises);
+        const anyConnected = results.some(result => result.status === 'fulfilled' && result.value !== null);
+        
+        if (!anyConnected) {
+          throw new Error('Failed to connect to any relays, even with extended timeout');
         }
       }
+      
+      console.log(`Connection process initiated. Currently connected to ${connectedRelays.length}/${secureRelayUrls.length} relays`);
     } catch (error) {
       console.error('Error connecting to relays:', error);
       

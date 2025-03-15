@@ -1,13 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAppSelector, useAppDispatch } from '../../redux/hooks';
-import { disconnectFromRelays } from '../../redux/slices/nostrSlice';
+import { disconnectFromRelays, connectToRelays } from '../../redux/slices/nostrSlice';
 import RelayStatusModal from './RelayStatusModal';
-
-// Import both real and mock services
-import realNostrService from '../../services/nostr/nostrService';
-import mockNostrService from '../../services/nostr/mockNostrService';
+import nostrService from '../../services/nostr/nostrService';
 
 interface ConnectionStatusProps {
   className?: string;
@@ -17,35 +14,14 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ className = 
   const dispatch = useAppDispatch();
   const { status, error, connectedRelays } = useAppSelector((state) => state.nostr);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [nostrService, setNostrService] = useState<any>(mockNostrService);
-  const [relayUrls, setRelayUrls] = useState<string[]>([]);
-
-  // Initialize nostrService and relayUrls
-  useEffect(() => {
-    try {
-      // Check if the real service is available and has the required methods
-      if (realNostrService && typeof realNostrService.getRelays === 'function') {
-        setNostrService(realNostrService);
-        setRelayUrls(realNostrService.getRelays());
-        console.log('ConnectionStatus: Using real Nostr service');
-      } else {
-        console.warn('ConnectionStatus: Real Nostr service missing required methods, falling back to mock');
-        setNostrService(mockNostrService);
-        setRelayUrls(mockNostrService.getRelays());
-      }
-    } catch (error) {
-      console.error('ConnectionStatus: Error initializing Nostr service, falling back to mock:', error);
-      setNostrService(mockNostrService);
-      setRelayUrls(mockNostrService.getRelays());
-    }
-  }, []);
+  const relayUrls = nostrService.getRelays();
 
   const handleDisconnect = () => {
-    try {
-      dispatch(disconnectFromRelays());
-    } catch (error) {
-      console.error('ConnectionStatus: Error disconnecting from relays:', error);
-    }
+    dispatch(disconnectFromRelays());
+  };
+
+  const handleReconnect = () => {
+    dispatch(connectToRelays());
   };
 
   // Status indicator styles
@@ -75,7 +51,7 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ className = 
     }
   };
 
-  // Position fixed at bottom left for desktop, hidden on mobile
+  // Position fixed at bottom right for desktop, hidden on mobile
   return (
     <>
       <div
@@ -100,6 +76,9 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ className = 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         relayUrls={relayUrls}
+        onDisconnect={handleDisconnect}
+        onReconnect={handleReconnect}
+        status={status}
       />
     </>
   );
