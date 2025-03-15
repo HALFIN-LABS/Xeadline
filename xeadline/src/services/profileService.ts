@@ -1,6 +1,6 @@
 /**
  * Profile Service
- * 
+ *
  * This service handles user profile operations including:
  * - Fetching profile information
  * - Updating profile information
@@ -11,9 +11,16 @@
 
 import { Event, getEventHash } from 'nostr-tools';
 import { hexToBytes } from '@noble/hashes/utils';
+import { createClient } from '@supabase/supabase-js';
 import nostrService from './nostr/nostrService';
 import { retrievePrivateKey } from '../utils/nostrKeys';
 import { isSafari, fetchSafariProfile } from './safariProfileService';
+
+// Initialize Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey);
 
 // NIP-01 defines kind 0 as metadata event
 const METADATA_KIND = 0;
@@ -43,27 +50,49 @@ export interface ProfileData extends ProfileMetadata {
 
 /**
  * Verifies a NIP-05 identifier
- * 
+ *
  * @param pubkey - The public key to verify
  * @param nip05 - The NIP-05 identifier (user@domain.com)
- * @returns Promise resolving to true if verified
+ * @returns Promise resolving to an object with verification status and type
  */
-export async function verifyNip05(pubkey: string, nip05: string): Promise<boolean> {
+export async function verifyNip05(pubkey: string, nip05: string): Promise<{ isVerified: boolean }> {
   try {
+    console.log(`Verifying NIP-05: ${nip05} for pubkey: ${pubkey}`);
     const [name, domain] = nip05.split('@');
-    if (!name || !domain) return false;
+    if (!name || !domain) {
+      console.log('Invalid NIP-05 format, missing name or domain');
+      return { isVerified: false };
+    }
 
+    console.log(`Fetching NIP-05 data from https://${domain}/.well-known/nostr.json?name=${name}`);
     const response = await fetch(`https://${domain}/.well-known/nostr.json?name=${name}`);
-    if (!response.ok) return false;
-
+    if (!response.ok) {
+      console.log(`NIP-05 fetch failed with status: ${response.status}`);
+      return { isVerified: false };
+    }
+    
     const data = await response.json();
+    console.log('NIP-05 verification response data:', JSON.stringify(data, null, 2));
+
     const names = data.names || {};
     const verifiedPubkey = names[name];
+    console.log(`NIP-05 names data:`, names);
+    console.log(`Verified pubkey from NIP-05: ${verifiedPubkey}`);
+    console.log(`Comparing with provided pubkey: ${pubkey}`);
 
-    return verifiedPubkey === pubkey;
+    // Check if the pubkey matches
+    if (verifiedPubkey !== pubkey) {
+      console.log('NIP-05 verification failed: pubkey mismatch');
+      return { isVerified: false };
+    }
+
+    // NIP-05 standard doesn't include verification_type
+    // We'll set a default value and let the database lookup handle the actual type
+    console.log('NIP-05 verification successful');
+    return { isVerified: true };
   } catch (error) {
     console.error('Error verifying NIP-05:', error);
-    return false;
+    return { isVerified: false };
   }
 }
 
@@ -103,7 +132,15 @@ export async function fetchUserProfile(publicKey: string): Promise<ProfileData |
         // On EOSE (End of Stored Events), process all collected events
         console.log('EOSE received for profile fetch');
         if (!hasResolved) {
-          processLatestEvent();
+          if (events.length > 0) {
+            processLatestEvent();
+          } else {
+            console.log('No profile events received on EOSE');
+            hasResolved = true;
+            clearTimeout(timeoutId);
+            nostrService.unsubscribe(subId);
+            resolve(null);
+          }
         }
       }
     );
@@ -113,6 +150,10 @@ export async function fetchUserProfile(publicKey: string): Promise<ProfileData |
       try {
         if (events.length === 0) {
           console.log('No profile events received');
+          hasResolved = true;
+          clearTimeout(timeoutId);
+          nostrService.unsubscribe(subId);
+          resolve(null);
           return;
         }
         
@@ -151,13 +192,20 @@ export async function fetchUserProfile(publicKey: string): Promise<ProfileData |
         // Check NIP-05 verification if available
         if (profile.nip05) {
           try {
-            const isVerified = await verifyNip05(publicKey, profile.nip05);
-            profile.isVerified = isVerified;
+            const verificationResult = await verifyNip05(publicKey, profile.nip05);
+            profile.isVerified = verificationResult.isVerified;
+            
+            if (verificationResult.isVerified) {
+              console.log('User is verified with NIP-05:', profile.nip05);
+            } else {
+              console.log('User not verified');
+            }
           } catch (error) {
             console.error('Error verifying NIP-05:', error);
           }
         }
         
+        console.log('Final profile data before resolving:', JSON.stringify(profile, null, 2));
         hasResolved = true;
         clearTimeout(timeoutId);
         nostrService.unsubscribe(subId);
@@ -257,8 +305,10 @@ export async function updateUserProfile(
     if (metadata.nip05 && pubkey) {
       try {
         console.log(`Pre-verifying NIP-05: ${metadata.nip05} for public key: ${pubkey}`);
-        isVerified = await verifyNip05(pubkey, metadata.nip05);
+        const verificationResult = await verifyNip05(pubkey, metadata.nip05);
+        isVerified = verificationResult.isVerified;
         console.log(`NIP-05 verification result: ${isVerified ? 'Verified' : 'Not Verified'}`);
+        // Verification type has been removed
       } catch (verifyError) {
         console.error('Error pre-verifying NIP-05:', verifyError);
         // Continue with the update even if verification fails
@@ -685,6 +735,8 @@ export async function fetchUserActivity(publicKey: string, limit: number = 20): 
         if (!hasResolved) {
           hasResolved = true;
           nostrService.unsubscribe(subId);
+          
+          console.log(`EOSE received for activity fetch, found ${events.length} events`);
           
           // Sort events by timestamp (newest first)
           events.sort((a, b) => b.created_at - a.created_at);
