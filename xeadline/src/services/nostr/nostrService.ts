@@ -180,13 +180,24 @@ class NostrService {
     try {
       console.log(`Connecting to relays: ${this.relayUrls.join(', ')}`);
       
+      // Force WebSocket protocol for Vercel deployments
+      const secureRelayUrls = this.relayUrls.map(url => {
+        // Ensure all relay URLs use secure WebSocket protocol
+        if (url.startsWith('ws:')) {
+          return url.replace('ws:', 'wss:');
+        }
+        return url;
+      });
+      
+      console.log(`Using secure relay URLs: ${secureRelayUrls.join(', ')}`);
+      
       // Connect to all relays with a timeout
       const connectedRelays: string[] = [];
-      const connectionPromises = this.relayUrls.map(async (url) => {
+      const connectionPromises = secureRelayUrls.map(async (url) => {
         try {
           // Create a promise that will reject after timeout
           const timeoutPromise = new Promise<null>((_, reject) => {
-            setTimeout(() => reject(new Error(`Connection to ${url} timed out`)), 10000);
+            setTimeout(() => reject(new Error(`Connection to ${url} timed out`)), 15000);
           });
           
           // Create a promise for the relay connection
@@ -216,9 +227,26 @@ class NostrService {
           error: null
         });
         
-        console.log(`Successfully connected to ${connectedRelays.length}/${this.relayUrls.length} relays`);
+        console.log(`Successfully connected to ${connectedRelays.length}/${secureRelayUrls.length} relays`);
       } else {
-        throw new Error('Failed to connect to any relays');
+        // Try to connect to at least one relay with a longer timeout
+        console.log('Retrying connection to first relay with longer timeout...');
+        try {
+          const firstRelay = await this.pool.ensureRelay(secureRelayUrls[0], { connectionTimeout: 30000 });
+          console.log('Connected to relay:', secureRelayUrls[0]);
+          connectedRelays.push(secureRelayUrls[0]);
+          
+          this.updateState({
+            status: 'connected',
+            connectedRelays,
+            error: null
+          });
+          
+          console.log(`Successfully connected to ${connectedRelays.length}/${secureRelayUrls.length} relays after retry`);
+        } catch (retryError) {
+          console.error('Retry failed:', retryError);
+          throw new Error('Failed to connect to any relays, even after retry');
+        }
       }
     } catch (error) {
       console.error('Error connecting to relays:', error);
