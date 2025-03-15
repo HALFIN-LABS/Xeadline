@@ -14,13 +14,13 @@ export const FeatureFlags = {
     enableProfileSync: true,
     
     // Enable publishing events to relays (requires enableConnection)
-    enablePublishing: false,
+    enablePublishing: true,
     
     // Enable subscribing to events from relays (requires enableConnection)
     enableSubscriptions: true,
     
     // Enable automatic reconnection on connection loss
-    enableAutoReconnect: false,
+    enableAutoReconnect: true,
   },
 };
 
