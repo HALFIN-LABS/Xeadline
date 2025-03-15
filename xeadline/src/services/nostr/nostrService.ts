@@ -7,7 +7,9 @@ const DEFAULT_RELAYS = [
   'wss://relay.nostr.band',
   'wss://nos.lol',
   'wss://relay.snort.social',
-  'wss://nostr.wine'
+  'wss://nostr.wine',
+  'wss://relay.current.fyi',
+  'wss://purplepag.es'
 ];
 
 // Define types
@@ -178,14 +180,24 @@ class NostrService {
     try {
       console.log(`Connecting to relays: ${this.relayUrls.join(', ')}`);
       
-      // Connect to all relays
+      // Connect to all relays with a timeout
       const connectedRelays: string[] = [];
       const connectionPromises = this.relayUrls.map(async (url) => {
         try {
-          const relay = await this.pool.ensureRelay(url);
-          console.log('Connected to relay:', url);
-          connectedRelays.push(url);
-          return relay;
+          // Create a promise that will reject after timeout
+          const timeoutPromise = new Promise<null>((_, reject) => {
+            setTimeout(() => reject(new Error(`Connection to ${url} timed out`)), 10000);
+          });
+          
+          // Create a promise for the relay connection
+          const connectionPromise = this.pool.ensureRelay(url).then(relay => {
+            console.log('Connected to relay:', url);
+            connectedRelays.push(url);
+            return relay;
+          });
+          
+          // Race the connection against the timeout
+          return await Promise.race([connectionPromise, timeoutPromise]);
         } catch (err) {
           console.error(`Failed to connect to relay ${url}:`, err);
           return null;
@@ -193,20 +205,21 @@ class NostrService {
       });
       
       // Wait for all connection attempts to complete
-      await Promise.all(connectionPromises);
+      await Promise.allSettled(connectionPromises);
       
-      if (connectedRelays.length === 0) {
+      // Consider connection successful if we connect to at least one relay
+      if (connectedRelays.length > 0) {
+        // Update state to connected
+        this.updateState({
+          status: 'connected',
+          connectedRelays,
+          error: null
+        });
+        
+        console.log(`Successfully connected to ${connectedRelays.length}/${this.relayUrls.length} relays`);
+      } else {
         throw new Error('Failed to connect to any relays');
       }
-      
-      // Update state to connected
-      this.updateState({
-        status: 'connected',
-        connectedRelays,
-        error: null
-      });
-      
-      console.log(`Successfully connected to ${connectedRelays.length} relays`);
     } catch (error) {
       console.error('Error connecting to relays:', error);
       
