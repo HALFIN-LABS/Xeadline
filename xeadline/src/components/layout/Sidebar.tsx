@@ -8,7 +8,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   
   return (
-    <aside className="w-64 hidden md:block flex-shrink-0 h-[calc(100vh-3.5rem)] sticky top-14 overflow-y-auto py-4 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800">
+    <aside className="w-64 hidden md:block flex-shrink-0 h-[calc(100vh-3.5rem)] sticky top-14 overflow-y-auto py-4 bg-gray-50 dark:bg-[rgb(10,10,10)] border-r border-gray-200 dark:border-gray-800">
       <div className="px-4">
         <div className="mb-6">
           <h2 className="text-lg font-semibold mb-2">Feeds</h2>
@@ -28,19 +28,19 @@ export default function Sidebar() {
         <div className="mb-6">
           <h2 className="text-lg font-semibold mb-2">Topics</h2>
           <nav className="space-y-1">
-            <SidebarLink href="/topic/news" icon={<NewsIcon />} active={pathname === '/topic/news'}>
+            <SidebarLink href="/t/news" icon={<NewsIcon />} active={pathname === '/t/news'}>
               News
             </SidebarLink>
-            <SidebarLink href="/topic/technology" icon={<DeviceIcon />} active={pathname === '/topic/technology'}>
+            <SidebarLink href="/t/technology" icon={<DeviceIcon />} active={pathname === '/t/technology'}>
               Technology
             </SidebarLink>
-            <SidebarLink href="/topic/bitcoin" icon={<BitcoinIcon />} active={pathname === '/topic/bitcoin'}>
+            <SidebarLink href="/t/bitcoin" icon={<BitcoinIcon />} active={pathname === '/t/bitcoin'}>
               Bitcoin
             </SidebarLink>
-            <SidebarLink href="/topic/lightning" icon={<LightningIcon />} active={pathname === '/topic/lightning'}>
+            <SidebarLink href="/t/lightning" icon={<LightningIcon />} active={pathname === '/t/lightning'}>
               Lightning
             </SidebarLink>
-            <SidebarLink href="/topic/nostr" icon={<NostrIcon />} active={pathname === '/topic/nostr'}>
+            <SidebarLink href="/t/nostr" icon={<NostrIcon />} active={pathname === '/t/nostr'}>
               Nostr
             </SidebarLink>
           </nav>

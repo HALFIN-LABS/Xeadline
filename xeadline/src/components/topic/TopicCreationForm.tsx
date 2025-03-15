@@ -1,22 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
-import { createCommunity, selectCommunityLoading, selectCommunityError } from '../../redux/slices/communitySlice';
+import { createTopic, selectTopicLoading, selectTopicError } from '../../redux/slices/topicSlice';
 import { selectCurrentUser } from '../../redux/slices/authSlice';
+import { generateSlug, isSlugAvailable, generateUniqueSlug } from '../../services/topicSlugService';
 
-interface CommunityCreationFormProps {
-  onSuccess?: (communityId: string) => void;
+interface TopicCreationFormProps {
+  onSuccess?: (topicId: string, slug: string) => void;
   onCancel?: () => void;
 }
 
-export default function CommunityCreationForm({ onSuccess, onCancel }: CommunityCreationFormProps) {
+export default function TopicCreationForm({ onSuccess, onCancel }: TopicCreationFormProps) {
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector(selectCurrentUser);
-  const isLoading = useAppSelector(selectCommunityLoading);
-  const error = useAppSelector(selectCommunityError);
+  const isLoading = useAppSelector(selectTopicLoading);
+  const error = useAppSelector(selectTopicError);
   
   const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [isSlugValid, setIsSlugValid] = useState(false);
+  const [isCheckingSlug, setIsCheckingSlug] = useState(false);
+  const [slugError, setSlugError] = useState('');
   const [description, setDescription] = useState('');
   const [rules, setRules] = useState<string[]>(['Be respectful', 'Stay on topic']);
   const [newRule, setNewRule] = useState('');
@@ -26,6 +31,51 @@ export default function CommunityCreationForm({ onSuccess, onCancel }: Community
   const [autoApproveAfter, setAutoApproveAfter] = useState(5);
   const [requireLightningDeposit, setRequireLightningDeposit] = useState(false);
   const [depositAmount, setDepositAmount] = useState(100);
+  
+  // Generate slug from name
+  useEffect(() => {
+    if (name) {
+      const generatedSlug = generateSlug(name);
+      setSlug(generatedSlug);
+      validateSlug(generatedSlug);
+    } else {
+      setSlug('');
+      setIsSlugValid(false);
+      setSlugError('');
+    }
+  }, [name]);
+  
+  // Validate slug
+  const validateSlug = async (slugToValidate: string) => {
+    if (!slugToValidate) {
+      setIsSlugValid(false);
+      setSlugError('Slug cannot be empty');
+      return;
+    }
+    
+    setIsCheckingSlug(true);
+    setSlugError('');
+    
+    try {
+      const available = await isSlugAvailable(slugToValidate);
+      setIsSlugValid(available);
+      if (!available) {
+        setSlugError('This slug is already taken. Please choose another one.');
+      }
+    } catch (error) {
+      console.error('Error checking slug availability:', error);
+      setSlugError('Error checking slug availability');
+    } finally {
+      setIsCheckingSlug(false);
+    }
+  };
+  
+  // Handle slug change
+  const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newSlug = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    setSlug(newSlug);
+    validateSlug(newSlug);
+  };
   
   const handleAddRule = () => {
     if (newRule.trim()) {
@@ -41,7 +91,7 @@ export default function CommunityCreationForm({ onSuccess, onCancel }: Community
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!name || !description) {
+    if (!name || !description || !isSlugValid) {
       return;
     }
     
@@ -53,8 +103,15 @@ export default function CommunityCreationForm({ onSuccess, onCancel }: Community
         ...(requireLightningDeposit && { depositAmount })
       };
       
-      const resultAction = await dispatch(createCommunity({
+      // Generate a unique slug if needed
+      let finalSlug = slug;
+      if (!isSlugValid) {
+        finalSlug = await generateUniqueSlug(name);
+      }
+      
+      const resultAction = await dispatch(createTopic({
         name,
+        slug: finalSlug,
         description,
         rules,
         image,
@@ -63,19 +120,19 @@ export default function CommunityCreationForm({ onSuccess, onCancel }: Community
         privateKey: currentUser?.privateKey
       }));
       
-      if (createCommunity.fulfilled.match(resultAction)) {
+      if (createTopic.fulfilled.match(resultAction)) {
         if (onSuccess) {
-          onSuccess(resultAction.payload.id);
+          onSuccess(resultAction.payload.id, resultAction.payload.slug);
         }
       }
     } catch (error) {
-      console.error('Failed to create community:', error);
+      console.error('Failed to create topic:', error);
     }
   };
   
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-      <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Create a New Community</h2>
+      <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Create a New Topic</h2>
       
       {error && (
         <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-md">
@@ -84,10 +141,10 @@ export default function CommunityCreationForm({ onSuccess, onCancel }: Community
       )}
       
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Community Name */}
+        {/* Topic Name */}
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Community Name*
+            Topic Name*
           </label>
           <input
             id="name"
@@ -98,6 +155,47 @@ export default function CommunityCreationForm({ onSuccess, onCancel }: Community
             placeholder="e.g., Xeadline News"
             required
           />
+        </div>
+        
+        {/* Topic Slug */}
+        <div>
+          <label htmlFor="slug" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Topic Slug* (will be used in URL: t/slug)
+          </label>
+          <div className="flex items-center">
+            <span className="inline-flex items-center px-3 py-2 rounded-l-md border border-r-0 border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+              t/
+            </span>
+            <input
+              id="slug"
+              type="text"
+              value={slug}
+              onChange={handleSlugChange}
+              className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-r-md shadow-sm focus:outline-none focus:ring-bottle-green focus:border-bottle-green dark:bg-gray-700 dark:text-white ${
+                slugError ? 'border-red-500 dark:border-red-700' : ''
+              }`}
+              placeholder="e.g., xeadline-news"
+              required
+            />
+          </div>
+          {isCheckingSlug && (
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Checking availability...
+            </p>
+          )}
+          {slugError && (
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+              {slugError}
+            </p>
+          )}
+          {isSlugValid && (
+            <p className="mt-1 text-sm text-green-600 dark:text-green-400">
+              Slug is available!
+            </p>
+          )}
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Only lowercase letters, numbers, and hyphens are allowed. No spaces.
+          </p>
         </div>
         
         {/* Description */}
@@ -111,15 +209,15 @@ export default function CommunityCreationForm({ onSuccess, onCancel }: Community
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-bottle-green focus:border-bottle-green dark:bg-gray-700 dark:text-white"
-            placeholder="What is this community about?"
+            placeholder="What is this topic about?"
             required
           />
         </div>
         
-        {/* Community Rules */}
+        {/* Topic Rules */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Community Rules
+            Topic Rules
           </label>
           <div className="mb-2">
             <ul className="list-disc pl-5 space-y-1">
@@ -159,10 +257,10 @@ export default function CommunityCreationForm({ onSuccess, onCancel }: Community
         
         {/* Images */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Community Image */}
+          {/* Topic Image */}
           <div>
             <label htmlFor="image" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Community Image URL
+              Topic Image URL
             </label>
             <input
               id="image"
@@ -310,10 +408,10 @@ export default function CommunityCreationForm({ onSuccess, onCancel }: Community
           )}
           <button
             type="submit"
-            disabled={isLoading || !name || !description}
+            disabled={isLoading || !name || !description || !isSlugValid}
             className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-bottle-green hover:bg-bottle-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-bottle-green disabled:opacity-50"
           >
-            {isLoading ? 'Creating...' : 'Create Community'}
+            {isLoading ? 'Creating...' : 'Create Topic'}
           </button>
         </div>
       </form>

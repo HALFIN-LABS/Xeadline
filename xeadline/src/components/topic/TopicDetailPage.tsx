@@ -3,38 +3,38 @@
 import React, { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import {
-  fetchCommunity,
-  selectCurrentCommunity,
-  selectCommunityLoading,
-  selectCommunityError,
-  subscribeToCommunity,
-  unsubscribeFromCommunity,
+  fetchTopic,
+  selectCurrentTopic,
+  selectTopicLoading,
+  selectTopicError,
+  subscribeToTopic,
+  unsubscribeFromTopic,
   selectIsSubscribed
-} from '../../redux/slices/communitySlice';
+} from '../../redux/slices/topicSlice';
 import { selectCurrentUser } from '../../redux/slices/authSlice';
 import Image from 'next/image';
 import Link from 'next/link';
 
-interface CommunityDetailPageProps {
-  communityId: string;
+interface TopicDetailPageProps {
+  topicId: string;
 }
 
-export default function CommunityDetailPage({ communityId }: CommunityDetailPageProps) {
+export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
   const dispatch = useAppDispatch();
-  const community = useAppSelector(selectCurrentCommunity);
-  const isLoading = useAppSelector(selectCommunityLoading);
-  const error = useAppSelector(selectCommunityError);
+  const topic = useAppSelector(selectCurrentTopic);
+  const isLoading = useAppSelector(selectTopicLoading);
+  const error = useAppSelector(selectTopicError);
   const currentUser = useAppSelector(selectCurrentUser);
-  const isSubscribed = useAppSelector(state => selectIsSubscribed(state, communityId));
+  const isSubscribed = useAppSelector(state => selectIsSubscribed(state, topicId));
   
   useEffect(() => {
-    dispatch(fetchCommunity(communityId));
-  }, [dispatch, communityId]);
+    dispatch(fetchTopic(topicId));
+  }, [dispatch, topicId]);
   
   const handleSubscribe = () => {
     if (currentUser) {
-      dispatch(subscribeToCommunity({
-        communityId,
+      dispatch(subscribeToTopic({
+        topicId,
         privateKey: currentUser.privateKey
       }));
     }
@@ -42,14 +42,14 @@ export default function CommunityDetailPage({ communityId }: CommunityDetailPage
   
   const handleUnsubscribe = () => {
     if (currentUser) {
-      dispatch(unsubscribeFromCommunity({
-        communityId,
+      dispatch(unsubscribeFromTopic({
+        topicId,
         privateKey: currentUser.privateKey
       }));
     }
   };
   
-  if (isLoading && !community) {
+  if (isLoading && !topic) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-bottle-green"></div>
@@ -65,29 +65,29 @@ export default function CommunityDetailPage({ communityId }: CommunityDetailPage
     );
   }
   
-  if (!community) {
+  if (!topic) {
     return (
       <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-6 my-4 text-center">
-        <p className="text-gray-700 dark:text-gray-300">Community not found.</p>
-        <Link href="/community/discover" className="mt-4 inline-block px-4 py-2 bg-bottle-green text-white rounded-md hover:bg-bottle-green-700 transition-colors">
-          Discover Communities
+        <p className="text-gray-700 dark:text-gray-300">Topic not found.</p>
+        <Link href="/t/discover" className="mt-4 inline-block px-4 py-2 bg-bottle-green text-white rounded-md hover:bg-bottle-green-700 transition-colors">
+          Discover Topics
         </Link>
       </div>
     );
   }
   
   // Generate a placeholder image if none is provided
-  const imageUrl = community.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(community.name)}&background=random&size=128`;
-  const bannerUrl = community.banner || 'https://via.placeholder.com/1200x300/718096/FFFFFF?text=';
+  const imageUrl = topic.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(topic.name)}&background=random&size=128`;
+  const bannerUrl = topic.banner || 'https://via.placeholder.com/1200x300/718096/FFFFFF?text=';
   
   // Format member count
-  const formattedMemberCount = community.memberCount ? 
-    community.memberCount > 1000 ? `${(community.memberCount / 1000).toFixed(1)}k` : community.memberCount.toString() 
+  const formattedMemberCount = topic.memberCount ? 
+    topic.memberCount > 1000 ? `${(topic.memberCount / 1000).toFixed(1)}k` : topic.memberCount.toString() 
     : '0';
   
   // Get moderation type label
   const getModerationLabel = () => {
-    switch (community.moderationSettings.moderationType) {
+    switch (topic.moderationSettings.moderationType) {
       case 'pre-approval':
         return 'Pre-approval moderation';
       case 'post-publication':
@@ -104,10 +104,10 @@ export default function CommunityDetailPage({ communityId }: CommunityDetailPage
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
         {/* Banner */}
         <div className="relative h-48 bg-gray-200 dark:bg-gray-700">
-          {community.banner && (
+          {topic.banner && (
             <Image
               src={bannerUrl}
-              alt={`${community.name} banner`}
+              alt={`${topic.name} banner`}
               fill
               className="object-cover"
               sizes="100vw"
@@ -116,13 +116,13 @@ export default function CommunityDetailPage({ communityId }: CommunityDetailPage
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
         </div>
         
-        {/* Community Info */}
+        {/* Topic Info */}
         <div className="px-6 py-4 relative">
-          {/* Community Image */}
+          {/* Topic Image */}
           <div className="absolute -top-16 left-6 rounded-full border-4 border-white dark:border-gray-800 overflow-hidden bg-gray-200 dark:bg-gray-700 w-32 h-32">
             <Image
               src={imageUrl}
-              alt={`${community.name} image`}
+              alt={`${topic.name} image`}
               width={128}
               height={128}
               className="object-cover"
@@ -140,15 +140,15 @@ export default function CommunityDetailPage({ communityId }: CommunityDetailPage
                     : 'bg-bottle-green text-white hover:bg-bottle-green-700'
                 }`}
               >
-                {isSubscribed ? 'Joined' : 'Join Community'}
+                {isSubscribed ? 'Joined' : 'Join Topic'}
               </button>
             </div>
           )}
           
-          {/* Community Details */}
+          {/* Topic Details */}
           <div className="mt-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{community.name}</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{topic.name}</h1>
             </div>
             
             <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
@@ -163,7 +163,7 @@ export default function CommunityDetailPage({ communityId }: CommunityDetailPage
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span>Created {new Date(community.createdAt * 1000).toLocaleDateString()}</span>
+                <span>Created {new Date(topic.createdAt * 1000).toLocaleDateString()}</span>
               </div>
               
               <div className="flex items-center">
@@ -175,16 +175,16 @@ export default function CommunityDetailPage({ communityId }: CommunityDetailPage
             </div>
             
             <div className="mt-4 text-gray-700 dark:text-gray-300">
-              {community.description}
+              {topic.description}
             </div>
             
-            {/* Community Rules */}
-            {community.rules && community.rules.length > 0 && (
+            {/* Topic Rules */}
+            {topic.rules && topic.rules.length > 0 && (
               <div className="mt-6">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Community Rules</h2>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Topic Rules</h2>
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-4">
                   <ul className="list-disc pl-5 space-y-1">
-                    {community.rules.map((rule, index) => (
+                    {topic.rules.map((rule, index) => (
                       <li key={index} className="text-gray-700 dark:text-gray-300">
                         {rule}
                       </li>
@@ -195,11 +195,11 @@ export default function CommunityDetailPage({ communityId }: CommunityDetailPage
             )}
             
             {/* Moderators */}
-            {community.moderators && community.moderators.length > 0 && (
+            {topic.moderators && topic.moderators.length > 0 && (
               <div className="mt-6">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Moderators</h2>
                 <div className="flex flex-wrap gap-2">
-                  {community.moderators.map((moderator, index) => (
+                  {topic.moderators.map((moderator, index) => (
                     <Link 
                       key={index}
                       href={`/profile/${moderator}`}
@@ -223,8 +223,8 @@ export default function CommunityDetailPage({ communityId }: CommunityDetailPage
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Posts</h2>
           
-          {currentUser && (
-            <Link href={`/community/${communityId}/post/create`} className="px-4 py-2 bg-bottle-green text-white rounded-md hover:bg-bottle-green-700 transition-colors">
+          {currentUser && topic && (
+            <Link href={`/t/${topic.slug}/post/create`} className="px-4 py-2 bg-bottle-green text-white rounded-md hover:bg-bottle-green-700 transition-colors">
               Create Post
             </Link>
           )}
@@ -232,7 +232,7 @@ export default function CommunityDetailPage({ communityId }: CommunityDetailPage
         
         <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-6 text-center">
           <p className="text-gray-700 dark:text-gray-300">
-            No posts yet. Be the first to post in this community!
+            No posts yet. Be the first to post in this topic!
           </p>
         </div>
       </div>

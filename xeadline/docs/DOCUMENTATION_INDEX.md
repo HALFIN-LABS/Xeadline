@@ -33,7 +33,7 @@ This document serves as a comprehensive index of all documentation for the Xeadl
 | [TECH_STACK_COMPARISON.md](./TECH_STACK_COMPARISON.md)     | Analysis of Next.js vs React+Redux+TailwindCSS+Vite for the project             |
 | [SECURITY_CONSIDERATIONS.md](./SECURITY_CONSIDERATIONS.md) | Security best practices, threat modeling, and mitigations                       |
 | [DEVELOPMENT_SETUP.md](./DEVELOPMENT_SETUP.md)             | Environment setup, dependencies, and configuration                              |
-| [DEVELOPMENT_SETUP.md](./DEVELOPMENT_SETUP.md)             | Environment setup, dependencies, and configuration                              |
+| [TOPIC_SLUG_MAPPING.md](./TOPIC_SLUG_MAPPING.md)           | Topic slug mapping system for human-readable URLs                               |
 
 ## Design Documentation
 
@@ -41,7 +41,6 @@ This document serves as a comprehensive index of all documentation for the Xeadl
 | ------------------------------------------------------------ | ----------------------------------------------------------------------- |
 | [UI_DESIGN_SPECIFICATION.md](./UI_DESIGN_SPECIFICATION.md)   | UI design guidelines, component specifications, and visual design       |
 | [UI_COMPONENTS.md](./UI_COMPONENTS.md)                       | Detailed specifications for key UI components with implementation notes |
-| [ACCESSIBILITY_GUIDELINES.md](./ACCESSIBILITY_GUIDELINES.md) | Accessibility standards, implementation guidelines, and testing         |
 | [ACCESSIBILITY_GUIDELINES.md](./ACCESSIBILITY_GUIDELINES.md) | Accessibility standards, implementation guidelines, and testing         |
 
 ## Quality Assurance
@@ -76,7 +75,7 @@ Key technical documents for developers:
 3. [NIP_COMPLIANCE.md](./NIP_COMPLIANCE.md) - Nostr protocol compliance
 4. [UI_DESIGN_SPECIFICATION.md](./UI_DESIGN_SPECIFICATION.md) - UI components and design
 5. [TESTING_STRATEGY.md](./TESTING_STRATEGY.md) - Testing approach
-6. [TESTING_STRATEGY.md](./TESTING_STRATEGY.md) - Testing approach
+6. [TOPIC_SLUG_MAPPING.md](./TOPIC_SLUG_MAPPING.md) - Topic slug mapping system
 
 ### For Project Managers
 
