@@ -43,8 +43,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <MainLayout>
                 {children}
               </MainLayout>
-              {/* Temporarily disabled ConnectionStatus to fix client-side error */}
-              {/* <ConnectionStatus /> */}
+              {/* Re-enabled ConnectionStatus with error handling */}
+              <ConnectionStatus />
             </BrowserCheck>
           </ErrorBoundary>
         </Providers>
