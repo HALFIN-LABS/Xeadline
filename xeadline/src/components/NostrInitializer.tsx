@@ -18,13 +18,21 @@ export const NostrInitializer = () => {
   const [error, setError] = useState<Error | null>(null);
   const [initializationPhase, setInitializationPhase] = useState<number>(0);
   
+  // Always call hooks regardless of conditions to maintain hook order
+  const connectionEnabled = isFeatureEnabled('nostr.enableConnection');
+  const profileSyncEnabled = isFeatureEnabled('nostr.enableProfileSync');
+  
+  // Use a dummy hook call to maintain hook order
+  const dummyNostrConnection = useNostrConnection;
+  const dummyProfileSync = useProfileSync;
+  
   // Phase 0: Initial setup and error handling
   useEffect(() => {
     try {
       console.log('NostrInitializer mounted - Phase 0: Initial setup');
       
       // Check if basic connection is enabled via feature flag
-      if (isFeatureEnabled('nostr.enableConnection')) {
+      if (connectionEnabled) {
         // Move to phase 1 after a short delay to allow the component to stabilize
         const timer = setTimeout(() => {
           setInitializationPhase(1);
@@ -38,7 +46,7 @@ export const NostrInitializer = () => {
       console.error('Error in NostrInitializer setup:', err);
       setError(err instanceof Error ? err : new Error(String(err)));
     }
-  }, []);
+  }, [connectionEnabled]);
   
   // Phase 1: Initialize basic Nostr connection
   useEffect(() => {
@@ -49,7 +57,7 @@ export const NostrInitializer = () => {
       
       // Move to phase 2 after a short delay to allow the connection to stabilize
       const timer = setTimeout(() => {
-        if (isFeatureEnabled('nostr.enableProfileSync')) {
+        if (profileSyncEnabled) {
           setInitializationPhase(2);
         }
       }, 2000);
@@ -59,7 +67,7 @@ export const NostrInitializer = () => {
       console.error('Error in NostrInitializer phase 1:', err);
       setError(err instanceof Error ? err : new Error(String(err)));
     }
-  }, [initializationPhase]);
+  }, [initializationPhase, profileSyncEnabled]);
   
   // Phase 2: Initialize profile synchronization
   useEffect(() => {
@@ -79,22 +87,55 @@ export const NostrInitializer = () => {
     return null;
   }
   
-  try {
-    // Initialize Nostr connection if enabled
-    if (initializationPhase >= 1 && isFeatureEnabled('nostr.enableConnection')) {
-      useNostrConnection();
-    }
-    
-    // Initialize profile synchronization if enabled
-    if (initializationPhase >= 2 && isFeatureEnabled('nostr.enableProfileSync')) {
-      useProfileSync();
-    }
-  } catch (err) {
-    console.error('Error initializing Nostr services:', err);
-  }
-  
   // This component doesn't render anything
   return null;
+};
+
+// Separate component to handle the actual initialization
+// This prevents React hooks order issues
+const NostrInitializerWrapper = () => {
+  const [initializationPhase, setInitializationPhase] = useState<number>(0);
+  
+  // Get the current phase from localStorage on mount
+  useEffect(() => {
+    try {
+      const storedPhase = localStorage.getItem('nostrInitializationPhase');
+      if (storedPhase) {
+        setInitializationPhase(parseInt(storedPhase, 10));
+      }
+    } catch (error) {
+      console.error('Error reading initialization phase from localStorage:', error);
+    }
+  }, []);
+  
+  // Update localStorage when phase changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('nostrInitializationPhase', initializationPhase.toString());
+    } catch (error) {
+      console.error('Error saving initialization phase to localStorage:', error);
+    }
+  }, [initializationPhase]);
+  
+  // Initialize Nostr connection if enabled
+  if (initializationPhase >= 1 && isFeatureEnabled('nostr.enableConnection')) {
+    try {
+      useNostrConnection();
+    } catch (error) {
+      console.error('Error initializing Nostr connection:', error);
+    }
+  }
+  
+  // Initialize profile synchronization if enabled
+  if (initializationPhase >= 2 && isFeatureEnabled('nostr.enableProfileSync')) {
+    try {
+      useProfileSync();
+    } catch (error) {
+      console.error('Error initializing profile sync:', error);
+    }
+  }
+  
+  return <NostrInitializer />;
 };
 
 export default NostrInitializer;
