@@ -44,21 +44,11 @@ export default async function handler(req, res) {
     
     console.log('Final response:', response);
     
-    // Set CORS headers first
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    
-    // Handle OPTIONS request for CORS preflight
-    if (req.method === 'OPTIONS') {
-      res.status(200).end();
-      return;
-    }
-    
     // Set cache headers - disable cache for testing
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
+    res.setHeader('Access-Control-Allow-Origin', '*');
     
     return res.status(200).json(response);
   } catch (error) {
