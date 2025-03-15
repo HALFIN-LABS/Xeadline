@@ -7,6 +7,8 @@ import AuthInitializer from '@/components/auth/AuthInitializer'
 import ConnectionStatus from '@/components/ui/ConnectionStatus'
 import MainLayout from '@/components/layout/MainLayout'
 import BrowserCheck from '@/components/BrowserCheck'
+import ErrorBoundary from '@/components/ErrorBoundary'
+import ErrorHandler from '@/components/ErrorHandler'
 import Script from 'next/script'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -32,14 +34,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={inter.className}>
         <Providers>
-          <BrowserCheck>
-            <NostrInitializer />
-            <AuthInitializer />
-            <MainLayout>
-              {children}
-            </MainLayout>
-            <ConnectionStatus />
-          </BrowserCheck>
+          <ErrorHandler />
+          <ErrorBoundary>
+            <BrowserCheck>
+              <NostrInitializer />
+              <AuthInitializer />
+              <MainLayout>
+                {children}
+              </MainLayout>
+              <ConnectionStatus />
+            </BrowserCheck>
+          </ErrorBoundary>
         </Providers>
       </body>
     </html>
