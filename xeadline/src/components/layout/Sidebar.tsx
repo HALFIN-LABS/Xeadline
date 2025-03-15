@@ -22,11 +22,14 @@ export default function Sidebar() {
             <SidebarLink href="/all" icon={<GlobeIcon />} active={pathname === '/all'}>
               All
             </SidebarLink>
+            <SidebarLink href="/t/discover" icon={<TopicsIcon />} active={pathname === '/t/discover'}>
+              Topics
+            </SidebarLink>
           </nav>
         </div>
 
         <div className="mb-6">
-          <h2 className="text-lg font-semibold mb-2">Topics</h2>
+          <h2 className="text-lg font-semibold mb-2">Featured</h2>
           <nav className="space-y-1">
             <SidebarLink href="/t/news" icon={<NewsIcon />} active={pathname === '/t/news'}>
               News
@@ -110,6 +113,14 @@ function HomeIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+    </svg>
+  );
+}
+
+function TopicsIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
     </svg>
   );
 }

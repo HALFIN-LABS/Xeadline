@@ -77,8 +77,11 @@ export default function Header() {
           </button>
         </div>
 
-        {/* Search bar - centered */}
-        <div className="flex-1 flex justify-center max-w-3xl mx-auto px-4">
+        {/* Spacer to push search bar to the right */}
+        <div className="flex-1 md:flex-none md:w-32"></div>
+        
+        {/* Search bar - right aligned to match content */}
+        <div className="flex-1 flex justify-end max-w-3xl mx-auto px-4">
           <div className={`w-full max-w-xl relative rounded-full ${isSearchFocused ? 'ring-2 ring-bottle-green' : ''}`}>
             <input
               type="text"
