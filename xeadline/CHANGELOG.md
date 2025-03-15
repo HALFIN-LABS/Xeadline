@@ -5,6 +5,33 @@ All notable changes to the Xeadline project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.2] - 2025-03-15
+
+### Added
+- Topic slug mapping system for human-readable URLs:
+  - Added Supabase table for storing slug to topic ID mappings
+  - Created API endpoints for creating and retrieving slug mappings
+  - Updated topic creation process to generate and validate unique slugs
+  - Modified routing to support clean URLs like `/t/bitcoin` instead of cryptic IDs
+  - Added comprehensive documentation in `docs/TOPIC_SLUG_MAPPING.md`
+- Improved NIP-05 identifier management:
+  - Added option to choose between Xeadline NIP-05 and external NIP-05 identifiers
+  - Created API endpoint to remove usernames from the wellknown list
+  - Added checkbox to toggle between Xeadline and external NIP-05 options
+  - Implemented logic to handle switching between identifier types
+  - Added visual status indicators for username availability
+  - Improved user experience with clearer labeling and organization
+- Added special verification badges:
+  - Added verification_type column to nip05_usernames table
+  - Implemented different badge colors for staff (bottle green) and contributors (gold)
+  - Updated profile display to show appropriate badge colors and labels
+
+### Fixed
+- Improved search bar UI by making the focus outline conform to the rounded shape of the input
+- Fixed profile edit modal not populating with user's profile data from the relay
+- Moved Lightning Address field above NIP-05 identifier inputs in the profile edit modal for better organization
+- Removed redundant username field from profile edit modal
+
 ## [2.2.1] - 2025-03-14
 
 ### Fixed

@@ -31,25 +31,19 @@ export default function Header() {
   const currentProfile = useAppSelector(selectCurrentProfile);
   const keyJustGenerated = useAppSelector(selectKeyJustGenerated);
 
-  // Close auth modal when user is authenticated, but not if a key was just generated
   useEffect(() => {
     if (isAuthenticated && !keyJustGenerated) {
       setShowAuthModal(false);
     }
   }, [isAuthenticated, keyJustGenerated]);
 
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
-  };
-  
-  const toggleUserMenu = () => {
-    setShowUserMenu(!showUserMenu);
-  };
+  const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
+  const toggleUserMenu = () => setShowUserMenu(!showUserMenu);
   
   const handleLogout = () => {
-    logoutUser(dispatch, true); // Pass true to clear all stored keys
+    logoutUser(dispatch, true);
     setShowUserMenu(false);
-    router.push('/'); // Redirect to home screen
+    router.push('/');
   };
   
   const openAuthModal = (mode: AuthMode) => {
@@ -58,12 +52,22 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-      <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-        {/* Logo and mobile menu button */}
-        <div className="flex items-center">
-          <button 
-            className="md:hidden mr-2 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
+    <header className="sticky top-0 z-50 bg-gray-50 dark:bg-[rgb(10,10,10)] border-b border-gray-200 dark:border-gray-800">
+      <div className="h-14 flex items-center">
+        {/* Logo */}
+        <Link href="/" className="flex items-center px-4">
+          <div className="h-8 w-8 relative mr-2 flex-shrink-0">
+            <div className="h-8 w-8 bg-bottle-green rounded-full flex items-center justify-center text-white font-bold">
+              X
+            </div>
+          </div>
+          <span className="text-xl font-bold text-bottle-green hidden sm:block">Xeadline</span>
+        </Link>
+
+        {/* Mobile menu button */}
+        <div className="md:hidden">
+          <button
+            className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
             onClick={toggleMenu}
             aria-label="Toggle menu"
           >
@@ -71,44 +75,28 @@ export default function Header() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          
-          <Link href="/" className="flex items-center">
-            <div className="h-8 w-8 relative mr-2 flex-shrink-0">
-              {/* Placeholder for logo - replace with actual logo */}
-              <div className="h-8 w-8 bg-bottle-green rounded-full flex items-center justify-center text-white font-bold">
-                X
-              </div>
-            </div>
-            <span className="text-xl font-bold text-bottle-green hidden sm:block">Xeadline</span>
-          </Link>
         </div>
 
-        {/* Navigation links - visible on desktop */}
-        <nav className="hidden md:flex space-x-1">
-          <NavLink href="/" active={pathname === '/'}>Home</NavLink>
-          <NavLink href="/popular" active={pathname === '/popular'}>Popular</NavLink>
-          <NavLink href="/all" active={pathname === '/all'}>All</NavLink>
-          <NavLink href="/community/discover" active={pathname ? pathname.startsWith('/community') : false}>Communities</NavLink>
-        </nav>
-
-        {/* Search bar */}
-        <div className={`flex-grow mx-4 max-w-xl relative ${isSearchFocused ? 'ring-2 ring-bottle-green' : ''}`}>
-          <input
-            type="text"
-            placeholder="Search Xeadline"
-            className="w-full py-2 px-4 bg-gray-100 dark:bg-gray-800 rounded-full focus:outline-none"
-            onFocus={() => setIsSearchFocused(true)}
-            onBlur={() => setIsSearchFocused(false)}
-          />
-          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+        {/* Search bar - centered */}
+        <div className="flex-1 flex justify-center max-w-3xl mx-auto px-4">
+          <div className={`w-full max-w-xl relative rounded-full ${isSearchFocused ? 'ring-2 ring-bottle-green' : ''}`}>
+            <input
+              type="text"
+              placeholder="Search Xeadline"
+              className="w-full py-2 px-4 bg-gray-100 dark:bg-gray-800 rounded-full focus:outline-none"
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setIsSearchFocused(false)}
+            />
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
           </div>
         </div>
 
         {/* User actions */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 px-4">
           {isAuthenticated ? (
             <div className="relative">
               <button
@@ -193,13 +181,26 @@ export default function Header() {
 
       {/* Mobile menu - visible when menu is open */}
       {isMenuOpen && (
-        <div className="md:hidden bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-          <div className="container mx-auto px-4 py-2">
+        <div className="md:hidden bg-gray-50 dark:bg-[rgb(10,10,10)] border-b border-gray-200 dark:border-gray-800">
+          <div className="px-4 py-2">
             <nav className="flex flex-col space-y-2">
-              <MobileNavLink href="/" active={pathname === '/'}>Home</MobileNavLink>
-              <MobileNavLink href="/popular" active={pathname === '/popular'}>Popular</MobileNavLink>
-              <MobileNavLink href="/all" active={pathname === '/all'}>All</MobileNavLink>
-              <MobileNavLink href="/community/discover" active={pathname ? pathname.startsWith('/community') : false}>Communities</MobileNavLink>
+              {/* Feeds */}
+              <div className="mb-2">
+                <MobileNavLink href="/" active={pathname === '/'}>Home</MobileNavLink>
+                <MobileNavLink href="/popular" active={pathname === '/popular'}>Popular</MobileNavLink>
+                <MobileNavLink href="/all" active={pathname === '/all'}>All</MobileNavLink>
+              </div>
+
+              {/* Topics */}
+              <div className="mb-2 pt-2 border-t border-gray-200 dark:border-gray-800">
+                <MobileNavLink href="/topic/news" active={pathname === '/topic/news'}>News</MobileNavLink>
+                <MobileNavLink href="/topic/technology" active={pathname === '/topic/technology'}>Technology</MobileNavLink>
+                <MobileNavLink href="/topic/bitcoin" active={pathname === '/topic/bitcoin'}>Bitcoin</MobileNavLink>
+                <MobileNavLink href="/topic/lightning" active={pathname === '/topic/lightning'}>Lightning</MobileNavLink>
+                <MobileNavLink href="/topic/nostr" active={pathname === '/topic/nostr'}>Nostr</MobileNavLink>
+              </div>
+
+              {/* Auth buttons */}
               <div className="pt-2 border-t border-gray-200 dark:border-gray-800 flex space-x-2">
                 {isAuthenticated ? (
                   <button
@@ -237,22 +238,6 @@ export default function Header() {
         initialMode={authModalMode}
       />
     </header>
-  );
-}
-
-// Navigation link component for desktop
-function NavLink({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
-  return (
-    <Link 
-      href={href} 
-      className={`px-3 py-2 rounded-md text-sm font-medium ${
-        active 
-          ? 'bg-bottle-green-50 text-bottle-green dark:bg-bottle-green-900 dark:text-bottle-green-300' 
-          : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
-      }`}
-    >
-      {children}
-    </Link>
   );
 }
 

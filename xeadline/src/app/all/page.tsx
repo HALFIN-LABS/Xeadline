@@ -4,7 +4,7 @@ export default function AllPage() {
   return (
     <div className="space-y-6">
       {/* Sticky filters at the top */}
-      <div className="sticky top-14 z-10 bg-gray-950 dark:bg-gray-950 py-4 border-b border-gray-800">
+      <div className="sticky top-14 z-10 bg-gray-50 dark:bg-[rgb(10,10,10)] py-4 border-b border-gray-800">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex flex-wrap gap-2">
             <button className="px-4 py-1.5 rounded-full bg-bottle-green text-white text-sm font-medium">
@@ -29,8 +29,13 @@ export default function AllPage() {
       {/* Posts */}
       <div className="space-y-6 pt-2">
         {/* Sample posts */}
-        {[1, 2, 3, 4, 5].map((post) => (
-          <AllPostCard key={post} />
+        {[1, 2, 3, 4, 5].map((post, index, array) => (
+          <div key={post}>
+            <AllPostCard />
+            {index < array.length - 1 && (
+              <div className="h-[1px] bg-gray-300 dark:bg-gray-600 border-t border-gray-400 dark:border-gray-500 mt-6 mb-6 max-w-[45rem] mx-auto" />
+            )}
+          </div>
         ))}
       </div>
     </div>
@@ -64,23 +69,31 @@ function AllPostCard() {
   const hasMedia = Math.random() > 0.5;
   const mediaType = hasMedia ? (Math.random() > 0.5 ? 'image' : 'video') : null;
   
+  // Determine if this is a short post (no media)
+  const isShortPost = !mediaType;
+  
+  // Generate random vote counts
+  const upvotes = Math.floor(Math.random() * 100);
+  const downvotes = Math.floor(Math.random() * 30);
+  const commentCount = Math.floor(Math.random() * 50);
+  
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden max-w-2xl mx-auto flex flex-col min-h-[400px]">
+    <div className="rounded-xl hover:bg-gray-50 hover:shadow-md dark:hover:bg-gray-800/80 overflow-hidden flex flex-col max-w-2xl mx-auto transition-all">
       {/* Post header */}
-      <div className="p-5 border-b border-gray-100 dark:border-gray-700">
-        <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 mb-2">
-          <Link href={`/topic/${randomTopic}`} className="font-medium text-bottle-green hover:underline mr-2">
+      <div className="p-3 pb-2">
+        <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-1">
+          <Link href={`/topic/${randomTopic}`} className="font-medium text-bottle-green hover:underline mr-1">
             t/{randomTopic}
           </Link>
-          <span className="mr-2">•</span>
+          <span className="mx-1">•</span>
           <span>Posted by </span>
           <Link href={`/user/${randomUsername}`} className="hover:underline mx-1">
             @{randomUsername}
           </Link>
-          <span className="mr-2">•</span>
+          <span className="mx-1">•</span>
           <span>{randomTime}</span>
         </div>
-        <h2 className="text-xl font-semibold mb-2">
+        <h2 className="text-lg font-semibold mb-1">
           <Link href="/post/1" className="hover:underline">
             {randomTitle}
           </Link>
@@ -110,40 +123,54 @@ function AllPostCard() {
         </div>
       )}
       
-      {/* Post content preview */}
-      <div className="p-5 flex-grow">
-        <p className="text-base text-gray-700 dark:text-gray-300">
-          Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor
-          incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud
-          exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-        </p>
-      </div>
+      {/* Post content preview - only show for short posts without media */}
+      {isShortPost && (
+        <div className="px-3 pb-2">
+          <p className="text-sm text-gray-700 dark:text-gray-300">
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor
+            incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud
+            exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+          </p>
+        </div>
+      )}
       
       {/* Post actions */}
-      <div className="px-5 py-3 bg-gray-50 dark:bg-gray-750 flex items-center text-gray-500 dark:text-gray-400 text-sm mt-auto">
-        <button className="flex items-center mr-6 hover:text-bottle-green">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-          </svg>
-          <span>{Math.floor(Math.random() * 100)}</span>
-        </button>
-        <button className="flex items-center mr-6 hover:text-red-500">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-          <span>{Math.floor(Math.random() * 20)}</span>
-        </button>
-        <button className="flex items-center mr-6 hover:text-blue-500">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="px-3 py-2 flex items-center space-x-2 text-gray-500 dark:text-gray-400 text-xs">
+        <div className="flex items-center space-x-2">
+          <button className="flex items-center space-x-1 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full hover:bg-gray-200 hover:text-bottle-green dark:hover:bg-gray-600 dark:hover:text-bottle-green transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+            </svg>
+            <span className="font-medium">{upvotes}</span>
+          </button>
+          
+          <button className="flex items-center space-x-1 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full hover:bg-gray-200 hover:text-red-500 dark:hover:bg-gray-600 dark:hover:text-red-500 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+            <span className="font-medium">{downvotes}</span>
+          </button>
+        </div>
+        
+        <button className="flex items-center space-x-1 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
-          <span>{Math.floor(Math.random() * 50)} comments</span>
+          <span>{commentCount} comments</span>
         </button>
-        <button className="flex items-center hover:text-yellow-500">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        
+        <button className="flex items-center space-x-1 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full hover:bg-gray-200 hover:text-yellow-500 dark:hover:bg-gray-600 dark:hover:text-yellow-500 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
           <span>Zap</span>
+        </button>
+        
+        <button className="flex items-center space-x-1 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+          </svg>
+          <span>Share</span>
         </button>
       </div>
     </div>

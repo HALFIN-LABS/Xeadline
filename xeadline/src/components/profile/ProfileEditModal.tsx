@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import {
   updateProfile,
@@ -28,7 +28,6 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
   const currentUser = useAppSelector(selectCurrentUser);
   const currentProfile = useAppSelector(selectCurrentProfile);
   
-  const [name, setName] = useState(profile?.name || '');
   const [displayName, setDisplayName] = useState(profile?.displayName || '');
   const [about, setAbout] = useState(profile?.about || '');
   const [website, setWebsite] = useState(profile?.website || '');
@@ -37,9 +36,35 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
   const [usernameAvailable, setUsernameAvailable] = useState(false);
   const [usernameChecking, setUsernameChecking] = useState(false);
   const [usernameError, setUsernameError] = useState('');
+  const [useExternalNip05, setUseExternalNip05] = useState(false);
   const [lud16, setLud16] = useState(profile?.lud16 || '');
   const [picture, setPicture] = useState(profile?.picture || '');
   const [banner, setBanner] = useState(profile?.banner || '');
+  
+  // Update form fields when profile data changes
+  useEffect(() => {
+    if (profile) {
+      setDisplayName(profile.displayName || '');
+      setAbout(profile.about || '');
+      setWebsite(profile.website || '');
+      setNip05(profile.nip05 || '');
+      setLud16(profile.lud16 || '');
+      setPicture(profile.picture || '');
+      setBanner(profile.banner || '');
+      
+      // Check if the user has an external NIP-05 identifier
+      if (profile.nip05) {
+        const parts = profile.nip05.split('@');
+        if (parts.length === 2) {
+          if (parts[1] === 'xeadline.com') {
+            setUseExternalNip05(false);
+          } else {
+            setUseExternalNip05(true);
+          }
+        }
+      }
+    }
+  }, [profile]);
   const [uploadingPicture, setUploadingPicture] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   
@@ -92,13 +117,26 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
     }
   };
 
-  // Extract username from NIP-05 identifier on component mount
+  // Extract username from NIP-05 identifier when nip05 changes
   React.useEffect(() => {
     if (nip05) {
       const parts = nip05.split('@');
       if (parts.length === 2 && parts[1] === 'xeadline.com') {
         setUsername(parts[0]);
+        // If it's a Xeadline username, it's already verified
+        setUsernameAvailable(true);
+        setUsernameError('');
+      } else {
+        // Reset username if nip05 is not a Xeadline username
+        setUsername('');
+        setUsernameAvailable(false);
+        setUsernameError('');
       }
+    } else {
+      // Reset username if nip05 is empty
+      setUsername('');
+      setUsernameAvailable(false);
+      setUsernameError('');
     }
   }, [nip05]);
 
@@ -141,38 +179,68 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
       return;
     }
     
-    // Handle Xeadline NIP-05 username claim if available
+    // Handle NIP-05 identifier based on user's choice
     let finalNip05 = nip05;
-    if (username && usernameAvailable) {
-      try {
-        const response = await fetch('/api/nip05/claim', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            username,
-            pubkey: currentUser.publicKey,
-          }),
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to claim username');
+    
+    if (useExternalNip05) {
+      // User has their own NIP-05 identifier, use it directly
+      finalNip05 = nip05;
+      
+      // If they previously had a Xeadline username, we need to remove it from the wellknown list
+      if (profile?.nip05 && profile.nip05.endsWith('@xeadline.com')) {
+        try {
+          const oldUsername = profile.nip05.split('@')[0];
+          
+          // Call the API to remove the username from the wellknown list
+          await fetch('/api/nip05/remove', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              username: oldUsername,
+              pubkey: currentUser.publicKey,
+            }),
+          });
+          
+          console.log(`Removed ${oldUsername} from wellknown list`);
+        } catch (error) {
+          console.error('Error removing username from wellknown list:', error);
+          // Continue with profile update even if username removal fails
         }
-        
-        // Update NIP-05 with the claimed username
-        finalNip05 = `${username}@xeadline.com`;
-      } catch (error) {
-        console.error('Error claiming username:', error);
-        // Continue with profile update even if username claim fails
+      }
+    } else {
+      // User wants to use Xeadline NIP-05
+      if (username && usernameAvailable) {
+        try {
+          const response = await fetch('/api/nip05/claim', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              username,
+              pubkey: currentUser.publicKey,
+            }),
+          });
+          
+          const data = await response.json();
+          
+          if (!response.ok) {
+            throw new Error(data.error || 'Failed to claim username');
+          }
+          
+          // Update NIP-05 with the claimed username
+          finalNip05 = `${username}@xeadline.com`;
+        } catch (error) {
+          console.error('Error claiming username:', error);
+          // Continue with profile update even if username claim fails
+        }
       }
     }
     
     // Create the metadata object
     const metadata = {
-      name,
       displayName,
       about,
       website,
@@ -346,27 +414,135 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
         </div>
         
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Username
-          </label>
-          <input
-            id="name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 shadow-sm focus:border-bottle-green focus:ring-bottle-green text-base py-2 px-3"
-          />
+          {!useExternalNip05 ? (
+            /* Xeadline NIP-05 Username */
+            <div className="mb-2">
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Username
+              </label>
+              <div className="flex items-center">
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => {
+                    const value = e.target.value.toLowerCase();
+                    setUsername(value);
+                    checkUsernameAvailability(value);
+                  }}
+                  className="mr-2 p-2 border rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 shadow-sm focus:border-bottle-green focus:ring-bottle-green"
+                  placeholder="username"
+                />
+                <span className="flex items-center">
+                  @xeadline.com
+                  {username && !usernameChecking && (
+                    <>
+                      {/* Username is already allocated to this user */}
+                      {profile?.nip05 === `${username}@xeadline.com` && (
+                        <span className="ml-2 text-blue-500" title="This username is already allocated to your profile">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      )}
+                      {/* Username is available */}
+                      {usernameAvailable && profile?.nip05 !== `${username}@xeadline.com` && (
+                        <span className="ml-2 text-green-500" title="Username available">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      )}
+                      {/* Username is not available */}
+                      {!usernameAvailable && profile?.nip05 !== `${username}@xeadline.com` && (
+                        <span className="ml-2 text-red-500" title={usernameError || "Username unavailable"}>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      )}
+                    </>
+                  )}
+                  {usernameChecking && (
+                    <span className="ml-2 text-gray-500">
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    </span>
+                  )}
+                </span>
+              </div>
+            </div>
+          ) : (
+            /* External NIP-05 */
+            <div>
+              <label htmlFor="nip05" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                External Identifier
+              </label>
+              <input
+                id="nip05"
+                type="text"
+                value={nip05}
+                onChange={(e) => setNip05(e.target.value)}
+                placeholder="you@example.com"
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 shadow-sm focus:border-bottle-green focus:ring-bottle-green text-base py-2 px-3"
+              />
+              <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <p>
+                  Used for verification. A verified NIP-05 identifier will display a blue checkmark next to your name.
+                </p>
+                <p className="mt-1">
+                  To set up external NIP-05 verification:
+                </p>
+                <ol className="list-decimal ml-4 mt-1 space-y-1">
+                  <li>Enter your identifier in the format <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">name@yourdomain.com</code></li>
+                  <li>Create a <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/.well-known/nostr.json</code> file on your domain</li>
+                  <li>Add your public key to the file (see <a href="https://github.com/nostr-protocol/nips/blob/master/05.md" target="_blank" rel="noopener noreferrer" className="text-bottle-green hover:underline">NIP-05 spec</a>)</li>
+                </ol>
+                <p className="mt-1">
+                  Don't have a domain? You can use services like <a href="https://nostr.directory" target="_blank" rel="noopener noreferrer" className="text-bottle-green hover:underline">nostr.directory</a> to get a free NIP-05 identifier.
+                </p>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex items-center mt-2">
+            <input
+              id="use-external-nip05"
+              type="checkbox"
+              checked={useExternalNip05}
+              onChange={(e) => setUseExternalNip05(e.target.checked)}
+              className="h-4 w-4 text-bottle-green focus:ring-bottle-green border-gray-300 rounded"
+            />
+            <label htmlFor="use-external-nip05" className="ml-2 block text-xs text-gray-500 dark:text-gray-400">
+              I have my own NIP-05 identifier
+            </label>
+          </div>
         </div>
         
         <div>
           <label htmlFor="about" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            About
+            Bio
           </label>
           <textarea
             id="about"
             value={about}
             onChange={(e) => setAbout(e.target.value)}
             rows={3}
+            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 shadow-sm focus:border-bottle-green focus:ring-bottle-green text-base py-2 px-3"
+          />
+        </div>
+        
+        <div>
+          <label htmlFor="lud16" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Lightning Address
+          </label>
+          <input
+            id="lud16"
+            type="text"
+            value={lud16}
+            onChange={(e) => setLud16(e.target.value)}
+            placeholder="you@lightning.wallet"
             className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 shadow-sm focus:border-bottle-green focus:ring-bottle-green text-base py-2 px-3"
           />
         </div>
@@ -381,91 +557,6 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
             value={website}
             onChange={(e) => setWebsite(e.target.value)}
             placeholder="https://example.com"
-            className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 shadow-sm focus:border-bottle-green focus:ring-bottle-green text-base py-2 px-3"
-          />
-        </div>
-        
-        <div>
-          <label htmlFor="nip05" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            NIP-05 Identifier
-          </label>
-          
-          {/* Xeadline NIP-05 Username */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Xeadline Username
-            </label>
-            <div className="flex items-center">
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => {
-                  const value = e.target.value.toLowerCase();
-                  setUsername(value);
-                  checkUsernameAvailability(value);
-                }}
-                className="mr-2 p-2 border rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 shadow-sm focus:border-bottle-green focus:ring-bottle-green"
-                placeholder="username"
-              />
-              <span>@xeadline.com</span>
-            </div>
-            {usernameChecking && (
-              <p className="text-sm mt-1 text-gray-500">Checking availability...</p>
-            )}
-            {username && !usernameChecking && (
-              <p className={`text-sm mt-1 ${usernameAvailable ? 'text-green-500' : 'text-red-500'}`}>
-                {usernameAvailable
-                  ? 'Username available!'
-                  : usernameError || 'Username unavailable'}
-              </p>
-            )}
-            <p className="text-xs mt-2 text-gray-500 dark:text-gray-400">
-              Claim a username on xeadline.com for NIP-05 verification. This will be automatically verified.
-            </p>
-          </div>
-          
-          {/* External NIP-05 */}
-          <div className="mt-4">
-            <label htmlFor="nip05" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              External NIP-05 Identifier (Optional)
-            </label>
-            <input
-              id="nip05"
-              type="text"
-              value={nip05}
-              onChange={(e) => setNip05(e.target.value)}
-              placeholder="you@example.com"
-              className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 shadow-sm focus:border-bottle-green focus:ring-bottle-green text-base py-2 px-3"
-            />
-            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              <p>
-                Used for verification. A verified NIP-05 identifier will display a blue checkmark next to your name.
-              </p>
-              <p className="mt-1">
-                To set up external NIP-05 verification:
-              </p>
-              <ol className="list-decimal ml-4 mt-1 space-y-1">
-                <li>Enter your identifier in the format <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">name@yourdomain.com</code></li>
-                <li>Create a <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/.well-known/nostr.json</code> file on your domain</li>
-                <li>Add your public key to the file (see <a href="https://github.com/nostr-protocol/nips/blob/master/05.md" target="_blank" rel="noopener noreferrer" className="text-bottle-green hover:underline">NIP-05 spec</a>)</li>
-              </ol>
-              <p className="mt-1">
-                Don't have a domain? You can use services like <a href="https://nostr.directory" target="_blank" rel="noopener noreferrer" className="text-bottle-green hover:underline">nostr.directory</a> to get a free NIP-05 identifier.
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <div>
-          <label htmlFor="lud16" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Lightning Address
-          </label>
-          <input
-            id="lud16"
-            type="text"
-            value={lud16}
-            onChange={(e) => setLud16(e.target.value)}
-            placeholder="you@lightning.wallet"
             className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 shadow-sm focus:border-bottle-green focus:ring-bottle-green text-base py-2 px-3"
           />
         </div>

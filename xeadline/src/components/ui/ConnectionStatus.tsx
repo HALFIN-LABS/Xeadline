@@ -50,23 +50,19 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ className = 
   return (
     <>
       <div
-        className={`fixed bottom-4 left-4 z-50 hidden md:block ${className} cursor-pointer transition-transform hover:scale-105`}
+        className={`fixed bottom-4 right-4 z-50 hidden md:block ${className} cursor-pointer transition-transform hover:scale-105`}
         onClick={() => setIsModalOpen(true)}
       >
-        <div className="bg-gray-800 rounded-lg shadow-lg p-3 max-w-xs">
-          <div className="flex items-center mb-1">
-            <div className={`w-3 h-3 rounded-full mr-2 ${getStatusColor()}`}></div>
-            <span className="text-sm font-medium">{getStatusText()}</span>
-          </div>
-          
-          {status === 'error' && error && (
-            <div className="text-xs text-red-500 mb-1">{error}</div>
-          )}
-          
+        <div className="bg-gray-800 rounded-lg shadow-lg px-3 py-2 flex items-center space-x-2">
+          <div className={`w-2 h-2 rounded-full ${getStatusColor()}`}></div>
+          <span className="text-sm font-medium">{getStatusText()}</span>
           {connectedRelays.length > 0 && (
-            <div className="text-xs text-gray-400">
-              Connected to {connectedRelays.length} relay{connectedRelays.length !== 1 ? 's' : ''}
-            </div>
+            <span className="text-sm text-gray-400">
+              ({connectedRelays.length}/{nostrService.relayUrls?.length || 0})
+            </span>
+          )}
+          {status === 'error' && error && (
+            <span className="text-xs text-red-500">{error}</span>
           )}
         </div>
       </div>
