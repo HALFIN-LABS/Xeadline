@@ -30,16 +30,24 @@ export default function Modal({ isOpen, onClose, children, title, footer }: Moda
     }
     
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('keydown', handleEscKey);
-      // Prevent scrolling of the body when modal is open
-      document.body.style.overflow = 'hidden';
+      try {
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleEscKey);
+        // Prevent scrolling of the body when modal is open
+        document.body.style.overflow = 'hidden';
+      } catch (error) {
+        console.error('Error adding event listeners:', error);
+      }
     }
     
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscKey);
-      document.body.style.overflow = 'auto';
+      try {
+        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('keydown', handleEscKey);
+        document.body.style.overflow = 'auto';
+      } catch (error) {
+        console.error('Error removing event listeners:', error);
+      }
     };
   }, [isOpen, onClose]);
   

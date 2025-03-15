@@ -25,8 +25,19 @@ export default function MainLayout({ children }: MainLayoutProps) {
       }
     }
     
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    try {
+      window.addEventListener('resize', handleResize)
+      return () => {
+        try {
+          window.removeEventListener('resize', handleResize)
+        } catch (error) {
+          console.error('Error removing resize event listener:', error)
+        }
+      }
+    } catch (error) {
+      console.error('Error adding resize event listener:', error)
+      return () => {}
+    }
   }, [])
 
   return (
@@ -51,7 +62,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         )}
         
         {/* Main Content */}
-        <main className={`flex-1 bg-gray-50 dark:bg-gray-950 min-h-[calc(100vh-3.5rem)] ${showRightSidebar ? '' : 'container mx-auto'}`}>
+        <main className={`flex-1 bg-gray-50 dark:bg-[rgb(10,10,10)] min-h-[calc(100vh-3.5rem)] ${showRightSidebar ? '' : 'container mx-auto'}`}>
           <div className="px-4 py-6">
             {children}
           </div>
