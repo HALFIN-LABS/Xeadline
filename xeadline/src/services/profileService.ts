@@ -64,8 +64,9 @@ export async function verifyNip05(pubkey: string, nip05: string): Promise<{ isVe
       return { isVerified: false };
     }
 
-    console.log(`Fetching NIP-05 data from https://${domain}/.well-known/nostr.json?name=${name}`);
-    const response = await fetch(`https://${domain}/.well-known/nostr.json?name=${name}`);
+    // Use our proxy API to avoid CORS issues with any domain
+    console.log(`Using NIP-05 proxy for domain: ${domain}, name: ${name}`);
+    const response = await fetch(`/api/nip05-proxy?domain=${encodeURIComponent(domain)}&name=${encodeURIComponent(name)}`);
     if (!response.ok) {
       console.log(`NIP-05 fetch failed with status: ${response.status}`);
       return { isVerified: false };
