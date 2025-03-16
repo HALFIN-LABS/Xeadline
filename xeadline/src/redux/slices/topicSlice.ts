@@ -347,6 +347,7 @@ export const fetchTopic = createAsyncThunk(
           console.log('Raw event content:', topicEvent.content);
           topicContent = JSON.parse(topicEvent.content);
           console.log('Parsed topic content:', topicContent);
+          console.log('Extracted moderators:', Array.isArray(topicContent.moderators) ? topicContent.moderators : [pubkey]);
         } catch (error) {
           console.error('Error parsing topic content:', error);
           console.error('Content that failed to parse:', topicEvent.content);
@@ -368,7 +369,7 @@ export const fetchTopic = createAsyncThunk(
           rules: Array.isArray(topicContent.rules) ? topicContent.rules : ['Be respectful', 'Stay on topic'],
           image: topicContent.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(dIdentifier)}&background=random&size=128`,
           banner: topicContent.banner || `https://ui-avatars.com/api/?name=${encodeURIComponent(dIdentifier)}&background=718096&color=FFFFFF&size=300&width=1200&height=300`,
-          moderators: [pubkey],
+          moderators: Array.isArray(topicContent.moderators) ? topicContent.moderators : [pubkey],
           createdAt: topicEvent.created_at,
           pubkey,
           moderationSettings: topicContent.moderationSettings || {
@@ -401,7 +402,8 @@ export const fetchTopic = createAsyncThunk(
       }
       
       // Fall back to mock topic if all else fails
-      console.log('Falling back to mock topic');
+      console.log('Falling back to mock topic for ID:', topicId);
+      console.log('This means the topic was not found in Nostr relays or the API');
       const mockTopic: Topic = {
         id: topicId,
         name: `Topic ${dIdentifier}`,
