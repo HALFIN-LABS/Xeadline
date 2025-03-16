@@ -126,7 +126,7 @@ export const createTopic = createAsyncThunk(
         
         // Sign the event
         event.id = getEventHash(event);
-        const sig = schnorr.sign(event.id, privateKey);
+        const sig = schnorr.sign(event.id, hexToBytes(privateKey));
         event.sig = Buffer.from(sig).toString('hex');
         signedEvent = event;
       } else {
@@ -212,7 +212,7 @@ export const createTopic = createAsyncThunk(
         } else if (privateKey) {
           // Use provided private key
           subscriptionEvent.id = getEventHash(subscriptionEvent);
-          const sig = schnorr.sign(subscriptionEvent.id, privateKey);
+          const sig = schnorr.sign(subscriptionEvent.id, hexToBytes(privateKey));
           subscriptionEvent.sig = Buffer.from(sig).toString('hex');
           signedSubscriptionEvent = subscriptionEvent;
         } else {
@@ -603,7 +603,7 @@ export const subscribeToTopic = createAsyncThunk(
         
         // Sign the event
         event.id = getEventHash(event);
-        const sig = schnorr.sign(event.id, privateKey);
+        const sig = schnorr.sign(event.id, hexToBytes(privateKey));
         event.sig = Buffer.from(sig).toString('hex');
         signedEvent = event;
       } else {
@@ -703,7 +703,7 @@ export const unsubscribeFromTopic = createAsyncThunk(
         
         // Sign the event
         event.id = getEventHash(event);
-        const sig = schnorr.sign(event.id, privateKey);
+        const sig = schnorr.sign(event.id, hexToBytes(privateKey));
         event.sig = Buffer.from(sig).toString('hex');
         signedEvent = event;
       } else {
@@ -1040,7 +1040,7 @@ export const updateTopicModerators = createAsyncThunk(
         
         // Sign the event
         event.id = getEventHash(event);
-        const sig = schnorr.sign(event.id, privateKey);
+        const sig = schnorr.sign(event.id, hexToBytes(privateKey));
         event.sig = Buffer.from(sig).toString('hex');
         signedEvent = event;
       } else {

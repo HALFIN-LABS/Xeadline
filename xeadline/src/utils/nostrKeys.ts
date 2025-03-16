@@ -5,7 +5,7 @@
  * It supports both direct key generation and interaction with Nostr browser extensions.
  */
 
-import { generateSecretKey, getPublicKey } from 'nostr-tools'
+import { generateSecretKey, getPublicKey, nip19 } from 'nostr-tools'
 import { encrypt, decrypt } from './encryption'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils'
 
@@ -36,9 +36,14 @@ export function validatePrivateKey(key: string): string | null {
   try {
     // Handle nsec format
     if (key.startsWith('nsec')) {
-      // This is a simplified example - in a real app, you'd decode the bech32 nsec
-      // For now, we'll just return a placeholder
-      return 'placeholder_for_decoded_nsec'
+      try {
+        // Decode the nsec using nip19
+        const { data } = nip19.decode(key);
+        return bytesToHex(data as Uint8Array);
+      } catch (error) {
+        console.error('Error decoding nsec:', error);
+        return null;
+      }
     }
     
     // Handle hex format (64 characters)
