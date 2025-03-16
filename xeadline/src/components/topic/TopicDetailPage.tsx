@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
+import { retrievePrivateKey } from '../../utils/nostrKeys';
 import {
   fetchTopic,
   selectCurrentTopic,
@@ -28,10 +29,57 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
   const currentUser = useAppSelector(selectCurrentUser);
   const isSubscribed = useAppSelector(state => selectIsSubscribed(state, topicId));
   const [isSubscribing, setIsSubscribing] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [password, setPassword] = useState('');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<'subscribe' | 'unsubscribe' | null>(null);
   
   useEffect(() => {
     dispatch(fetchTopic(topicId));
   }, [dispatch, topicId]);
+  
+  const handlePasswordSubmit = useCallback(async () => {
+    if (!currentUser || !password) return;
+    
+    try {
+      setPasswordError(null);
+      const privateKey = await retrievePrivateKey(password);
+      
+      if (!privateKey) {
+        setPasswordError('Invalid password');
+        return;
+      }
+      
+      console.log('Successfully decrypted private key', {
+        privateKeyLength: privateKey.length,
+        privateKeyType: typeof privateKey
+      });
+      
+      if (pendingAction === 'subscribe') {
+        await dispatch(subscribeToTopic({
+          topicId,
+          privateKey
+        })).unwrap();
+        console.log('Successfully subscribed to topic after password entry');
+      } else if (pendingAction === 'unsubscribe') {
+        await dispatch(unsubscribeFromTopic({
+          topicId,
+          privateKey
+        })).unwrap();
+        console.log('Successfully unsubscribed from topic after password entry');
+      }
+      
+      // Close the modal and reset state
+      setShowPasswordModal(false);
+      setPassword('');
+      setPendingAction(null);
+      setIsSubscribing(false);
+    } catch (error) {
+      console.error('Error after password entry:', error);
+      setPasswordError('Error processing request');
+      setIsSubscribing(false);
+    }
+  }, [currentUser, password, pendingAction, topicId, dispatch]);
   
   const handleSubscribe = async () => {
     if (currentUser) {
@@ -46,20 +94,36 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
         privateKeyLength: currentUser.privateKey ? currentUser.privateKey.length : 0
       });
       
-      try {
-        await dispatch(subscribeToTopic({
-          topicId,
-          privateKey: currentUser.privateKey
-        })).unwrap();
-        
-        console.log('Successfully subscribed to topic');
-      } catch (error) {
-        console.error('Error subscribing to topic:', error);
-      } finally {
+      // Check if we have a private key in memory
+      if (currentUser.privateKey) {
+        try {
+          await dispatch(subscribeToTopic({
+            topicId,
+            privateKey: currentUser.privateKey
+          })).unwrap();
+          
+          console.log('Successfully subscribed to topic');
+        } catch (error) {
+          console.error('Error subscribing to topic:', error);
+        } finally {
+          setIsSubscribing(false);
+        }
+      }
+      // Check if we have an encrypted private key in storage
+      else if (currentUser.encryptedPrivateKey) {
+        console.log('No private key in memory, but found encrypted key. Showing password prompt.');
+        setPendingAction('subscribe');
+        setShowPasswordModal(true);
+        // Don't reset isSubscribing here, it will be reset after password entry
+      }
+      // No private key available
+      else {
+        console.error('Cannot subscribe: No private key available');
         setIsSubscribing(false);
       }
     } else {
       console.error('Cannot subscribe: No current user');
+      setIsSubscribing(false);
     }
   };
   
@@ -76,20 +140,36 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
         privateKeyLength: currentUser.privateKey ? currentUser.privateKey.length : 0
       });
       
-      try {
-        await dispatch(unsubscribeFromTopic({
-          topicId,
-          privateKey: currentUser.privateKey
-        })).unwrap();
-        
-        console.log('Successfully unsubscribed from topic');
-      } catch (error) {
-        console.error('Error unsubscribing from topic:', error);
-      } finally {
+      // Check if we have a private key in memory
+      if (currentUser.privateKey) {
+        try {
+          await dispatch(unsubscribeFromTopic({
+            topicId,
+            privateKey: currentUser.privateKey
+          })).unwrap();
+          
+          console.log('Successfully unsubscribed from topic');
+        } catch (error) {
+          console.error('Error unsubscribing from topic:', error);
+        } finally {
+          setIsSubscribing(false);
+        }
+      }
+      // Check if we have an encrypted private key in storage
+      else if (currentUser.encryptedPrivateKey) {
+        console.log('No private key in memory, but found encrypted key. Showing password prompt.');
+        setPendingAction('unsubscribe');
+        setShowPasswordModal(true);
+        // Don't reset isSubscribing here, it will be reset after password entry
+      }
+      // No private key available
+      else {
+        console.error('Cannot unsubscribe: No private key available');
         setIsSubscribing(false);
       }
     } else {
       console.error('Cannot unsubscribe: No current user');
+      setIsSubscribing(false);
     }
   };
   
@@ -145,6 +225,51 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
   
   return (
     <div className="container mx-auto px-4 py-6">
+      {/* Password Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Enter Password</h2>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              Your private key is encrypted. Please enter your password to decrypt it and {pendingAction === 'subscribe' ? 'subscribe to' : 'unsubscribe from'} this topic.
+            </p>
+            
+            {passwordError && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3 mb-4">
+                <p className="text-red-700 dark:text-red-300 text-sm">{passwordError}</p>
+              </div>
+            )}
+            
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md mb-4 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+            
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={() => {
+                  setShowPasswordModal(false);
+                  setPassword('');
+                  setPendingAction(null);
+                  setIsSubscribing(false);
+                }}
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePasswordSubmit}
+                className="px-4 py-2 bg-bottle-green text-white rounded-md hover:bg-bottle-green-700"
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
         {/* Banner */}
         <div className="relative h-48 bg-gray-200 dark:bg-gray-700">
