@@ -134,9 +134,26 @@ export const createTopic = createAsyncThunk(
       }
       
       // Publish the event to Nostr relays
-      console.log('Publishing topic event to Nostr relays:', signedEvent);
-      const publishedTo = await nostrService.publishEvent(signedEvent);
-      console.log(`Published topic event to ${publishedTo.length} relays`);
+      console.log('Publishing topic event to Nostr relays:', {
+        id: signedEvent.id,
+        pubkey: signedEvent.pubkey,
+        kind: signedEvent.kind,
+        created_at: signedEvent.created_at,
+        tags: signedEvent.tags,
+        content: signedEvent.content
+      });
+      
+      try {
+        const publishedTo = await nostrService.publishEvent(signedEvent);
+        console.log(`Published topic event to ${publishedTo.length} relays:`, publishedTo);
+        
+        if (publishedTo.length === 0) {
+          console.error('Failed to publish to any relays. Check relay connections.');
+        }
+      } catch (error) {
+        console.error('Error publishing to Nostr relays:', error);
+        // Continue even if publishing fails, as we still want to create the topic in the local state
+      }
       
       // Create the topic object
       const topic: Topic = {
@@ -190,36 +207,73 @@ export const fetchTopic = createAsyncThunk(
       // Try to fetch the topic from Nostr relays
       console.log(`Fetching topic with ID: ${topicId} from Nostr relays`);
       
-      // Create a filter to get the topic definition event
+      // Create filters to get the topic definition event
+      // Try multiple filter combinations to increase chances of finding the topic
       const filters: Filter[] = [
+        // Filter by author and d-tag
         {
           kinds: [34550], // NIP-72 topic definition
           authors: [pubkey],
           '#d': [dIdentifier],
-          limit: 1
+          limit: 5
+        },
+        // Broader filter - just by d-tag
+        {
+          kinds: [34550], // NIP-72 topic definition
+          '#d': [dIdentifier],
+          limit: 5
+        },
+        // Try with just the base slug without the unique suffix
+        {
+          kinds: [34550], // NIP-72 topic definition
+          '#d': [dIdentifier.split('-').slice(0, -1).join('-')],
+          limit: 5
         }
       ];
+      
+      console.log('Nostr filters:', JSON.stringify(filters, null, 2));
       
       // Fetch events from Nostr relays
       const events = await nostrService.getEvents(filters);
       console.log(`Found ${events.length} topic events`);
+      
+      // Log all events for debugging
+      events.forEach((event, index) => {
+        console.log(`Event ${index}:`, {
+          id: event.id,
+          pubkey: event.pubkey,
+          created_at: event.created_at,
+          tags: event.tags,
+          content: event.content.substring(0, 100) + (event.content.length > 100 ? '...' : '')
+        });
+      });
       
       if (events.length > 0) {
         // Sort events by created_at to get the most recent one
         const sortedEvents = events.sort((a, b) => b.created_at - a.created_at);
         const topicEvent = sortedEvents[0];
         
+        console.log('Selected topic event:', {
+          id: topicEvent.id,
+          pubkey: topicEvent.pubkey,
+          created_at: topicEvent.created_at,
+          tags: topicEvent.tags
+        });
+        
         // Extract topic name from tags
         const nameTag = topicEvent.tags.find(tag => tag[0] === 'name');
         const name = nameTag ? nameTag[1] : `Topic ${dIdentifier}`;
+        console.log('Extracted name:', name);
         
         // Parse the topic content from the event content
         let topicContent;
         try {
+          console.log('Raw event content:', topicEvent.content);
           topicContent = JSON.parse(topicEvent.content);
           console.log('Parsed topic content:', topicContent);
         } catch (error) {
           console.error('Error parsing topic content:', error);
+          console.error('Content that failed to parse:', topicEvent.content);
           topicContent = {
             description: 'Error parsing topic content',
             rules: ['Be respectful', 'Stay on topic'],
