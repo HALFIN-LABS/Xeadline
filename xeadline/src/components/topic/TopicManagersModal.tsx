@@ -28,8 +28,10 @@ export default function TopicManagersModal({ isOpen, onClose }: TopicManagersMod
     }
   }, [currentTopic]);
   
-  // Check if current user is the topic creator
+  // Check if current user is the topic creator or a moderator
   const isCreator = currentUser?.publicKey === currentTopic?.pubkey;
+  const isModerator = currentTopic?.moderators.includes(currentUser?.publicKey || '');
+  const canManageModerators = isCreator || isModerator;
   
   const handleAddModerator = () => {
     // Validate pubkey format (simple check for now)
@@ -69,8 +71,8 @@ export default function TopicManagersModal({ isOpen, onClose }: TopicManagersMod
       return;
     }
     
-    if (!isCreator) {
-      setError('Only the topic creator can update managers');
+    if (!canManageModerators) {
+      setError('Only topic moderators can update managers');
       return;
     }
     
@@ -128,7 +130,7 @@ export default function TopicManagersModal({ isOpen, onClose }: TopicManagersMod
       <button
         type="submit"
         form="managers-form"
-        disabled={isUpdating || !isCreator}
+        disabled={isUpdating || !canManageModerators}
         className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-bottle-green hover:bg-bottle-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-bottle-green disabled:opacity-70"
       >
         {isUpdating ? 'Saving...' : 'Save Changes'}
@@ -143,9 +145,9 @@ export default function TopicManagersModal({ isOpen, onClose }: TopicManagersMod
       title="Manage Topic Managers"
       footer={modalFooter}
     >
-      {!isCreator && (
+      {!canManageModerators && (
         <div className="mb-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-3 text-sm text-yellow-600 dark:text-yellow-400">
-          Only the topic creator can manage topic managers.
+          Only topic moderators can manage topic managers.
         </div>
       )}
       
@@ -180,7 +182,7 @@ export default function TopicManagersModal({ isOpen, onClose }: TopicManagersMod
                   <button
                     type="button"
                     onClick={() => handleRemoveModerator(pubkey)}
-                    disabled={pubkey === currentTopic?.pubkey || !isCreator}
+                    disabled={pubkey === currentTopic?.pubkey || !canManageModerators}
                     className="text-red-500 hover:text-red-700 disabled:text-gray-400 disabled:cursor-not-allowed"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -201,13 +203,13 @@ export default function TopicManagersModal({ isOpen, onClose }: TopicManagersMod
                 value={newModeratorPubkey}
                 onChange={(e) => setNewModeratorPubkey(e.target.value)}
                 placeholder="Enter public key"
-                disabled={!isCreator}
+                disabled={!canManageModerators}
                 className="flex-grow mr-2 p-2 border rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-800 shadow-sm focus:border-bottle-green focus:ring-bottle-green text-sm"
               />
               <button
                 type="button"
                 onClick={handleAddModerator}
-                disabled={!isCreator}
+                disabled={!canManageModerators}
                 className="px-4 py-2 bg-bottle-green text-white rounded-md hover:bg-bottle-green-700 disabled:opacity-70"
               >
                 Add

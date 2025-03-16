@@ -569,7 +569,10 @@ export const subscribeToTopic = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      console.log(`Subscribing to topic: ${topicId}`);
+      console.log(`Subscribing to topic: ${topicId}`, {
+        hasPrivateKey: !!privateKey,
+        hasNostrExtension: typeof window !== 'undefined' && !!window.nostr
+      });
       
       // Create a subscription event
       const event: Event = {
@@ -1018,9 +1021,9 @@ export const updateTopicModerators = createAsyncThunk(
         // Use Nostr extension
         event.pubkey = await window.nostr.getPublicKey();
         
-        // Verify that the current user is the topic creator
-        if (event.pubkey !== pubkey) {
-          return rejectWithValue('Only the topic creator can update moderators');
+        // Verify that the current user is a moderator
+        if (!topic.moderators.includes(event.pubkey)) {
+          return rejectWithValue('Only topic moderators can update moderators');
         }
         
         signedEvent = await window.nostr.signEvent(event);
@@ -1028,9 +1031,9 @@ export const updateTopicModerators = createAsyncThunk(
         // Use provided private key
         const derivedPubkey = getPublicKey(hexToBytes(privateKey));
         
-        // Verify that the current user is the topic creator
-        if (derivedPubkey !== pubkey) {
-          return rejectWithValue('Only the topic creator can update moderators');
+        // Verify that the current user is a moderator
+        if (!topic.moderators.includes(derivedPubkey)) {
+          return rejectWithValue('Only topic moderators can update moderators');
         }
         
         event.pubkey = derivedPubkey;

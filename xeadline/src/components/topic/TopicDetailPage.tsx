@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import {
   fetchTopic,
@@ -27,26 +27,63 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
   const error = useAppSelector(selectTopicError);
   const currentUser = useAppSelector(selectCurrentUser);
   const isSubscribed = useAppSelector(state => selectIsSubscribed(state, topicId));
+  const [isSubscribing, setIsSubscribing] = useState(false);
   
   useEffect(() => {
     dispatch(fetchTopic(topicId));
   }, [dispatch, topicId]);
   
-  const handleSubscribe = () => {
+  const handleSubscribe = async () => {
     if (currentUser) {
-      dispatch(subscribeToTopic({
+      setIsSubscribing(true);
+      
+      console.log('Subscribing to topic:', {
         topicId,
-        privateKey: currentUser.privateKey
-      }));
+        hasPrivateKey: !!currentUser.privateKey,
+        userPublicKey: currentUser.publicKey
+      });
+      
+      try {
+        await dispatch(subscribeToTopic({
+          topicId,
+          privateKey: currentUser.privateKey
+        })).unwrap();
+        
+        console.log('Successfully subscribed to topic');
+      } catch (error) {
+        console.error('Error subscribing to topic:', error);
+      } finally {
+        setIsSubscribing(false);
+      }
+    } else {
+      console.error('Cannot subscribe: No current user');
     }
   };
   
-  const handleUnsubscribe = () => {
+  const handleUnsubscribe = async () => {
     if (currentUser) {
-      dispatch(unsubscribeFromTopic({
+      setIsSubscribing(true);
+      
+      console.log('Unsubscribing from topic:', {
         topicId,
-        privateKey: currentUser.privateKey
-      }));
+        hasPrivateKey: !!currentUser.privateKey,
+        userPublicKey: currentUser.publicKey
+      });
+      
+      try {
+        await dispatch(unsubscribeFromTopic({
+          topicId,
+          privateKey: currentUser.privateKey
+        })).unwrap();
+        
+        console.log('Successfully unsubscribed from topic');
+      } catch (error) {
+        console.error('Error unsubscribing from topic:', error);
+      } finally {
+        setIsSubscribing(false);
+      }
+    } else {
+      console.error('Cannot unsubscribe: No current user');
     }
   };
   
@@ -140,7 +177,17 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
                     : 'bg-bottle-green text-white hover:bg-bottle-green-700'
                 }`}
               >
-                {isSubscribed ? 'Joined' : 'Join Topic'}
+                {isSubscribing ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    {isSubscribed ? 'Leaving...' : 'Joining...'}
+                  </span>
+                ) : (
+                  isSubscribed ? 'Joined' : 'Join Topic'
+                )}
               </button>
             </div>
           )}
