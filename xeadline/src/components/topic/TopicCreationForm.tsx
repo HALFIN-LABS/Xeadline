@@ -162,6 +162,25 @@ export default function TopicCreationForm({ onSuccess, onCancel }: TopicCreation
           }
         }
         
+        // Save topic content to database
+        try {
+          await fetch('/api/topic/save-content', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              topicId: resultAction.payload.id,
+              description,
+              rules,
+              createdBy: currentUser?.publicKey
+            }),
+          });
+        } catch (error) {
+          console.error('Error saving topic content:', error);
+          // Continue even if content saving fails
+        }
+        
         if (onSuccess) {
           onSuccess(resultAction.payload.id, resultAction.payload.slug);
         }

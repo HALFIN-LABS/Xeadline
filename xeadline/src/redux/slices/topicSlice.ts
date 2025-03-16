@@ -219,7 +219,7 @@ export const fetchTopic = createAsyncThunk(
         id: topicId,
         name: `Topic ${dIdentifier}`,
         slug: dIdentifier,
-        description: 'This is a mock topic for development purposes.',
+        description: 'Topic content is loading or unavailable. Please refresh the page.',
         rules: ['Be respectful', 'Stay on topic'],
         image: `https://ui-avatars.com/api/?name=${encodeURIComponent(dIdentifier)}&background=random&size=128`,
         banner: `https://ui-avatars.com/api/?name=${encodeURIComponent(dIdentifier)}&background=718096&color=FFFFFF&size=300&width=1200&height=300`,
