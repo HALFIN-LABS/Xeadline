@@ -10,6 +10,7 @@ import BrowserCheck from '@/components/BrowserCheck'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import ErrorHandler from '@/components/ErrorHandler'
 import Script from 'next/script'
+import { Analytics } from '@vercel/analytics/react'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -20,17 +21,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <head>
-        <Script id="theme-script" strategy="beforeInteractive">
-          {`
-            (function() {
-              // Force dark mode
-              document.documentElement.classList.add('dark');
-              console.log('Dark mode enforced');
-            })();
-          `}
-        </Script>
+        {/* Dark mode is now applied directly to the HTML element */}
       </head>
       <body className={inter.className}>
         <Providers>
@@ -48,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </BrowserCheck>
           </ErrorBoundary>
         </Providers>
+        <Analytics />
       </body>
     </html>
   )

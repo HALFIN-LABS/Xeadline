@@ -131,6 +131,13 @@ export async function loginWithPrivateKey(
       // Create session
       createSession({ hasStoredKey: false, useExtension: false });
       
+      console.log('Storing private key in memory for session', {
+        publicKey,
+        privateKeyLength: normalizedKey.length,
+        privateKeyType: typeof normalizedKey,
+        privateKeyStart: normalizedKey.substring(0, 4) + '...'
+      });
+      
       dispatch(loginSuccess({
         publicKey,
         privateKey: normalizedKey

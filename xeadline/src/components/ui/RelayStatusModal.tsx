@@ -2,72 +2,59 @@
 
 import React, { useEffect, useRef } from 'react';
 import { useAppSelector } from '../../redux/hooks';
+import { ConnectionStatus } from '../../services/nostr/nostrService';
 
 interface RelayStatusModalProps {
   isOpen: boolean;
   onClose: () => void;
   relayUrls: string[];
+  onDisconnect?: () => void;
+  onReconnect?: () => void;
+  status?: ConnectionStatus;
 }
 
-const RelayStatusModal: React.FC<RelayStatusModalProps> = ({ isOpen, onClose, relayUrls }) => {
+const RelayStatusModal: React.FC<RelayStatusModalProps> = ({
+  isOpen,
+  onClose,
+  relayUrls,
+  onDisconnect,
+  onReconnect,
+  status = 'disconnected'
+}) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const { connectedRelays } = useAppSelector((state) => state.nostr);
   
   // Handle click outside to close
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      try {
-        if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
-          onClose();
-        }
-      } catch (error) {
-        console.error('RelayStatusModal: Error handling click outside:', error);
+      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+        onClose();
       }
     };
     
     if (isOpen) {
-      try {
-        document.addEventListener('mousedown', handleClickOutside);
-      } catch (error) {
-        console.error('RelayStatusModal: Error adding mousedown event listener:', error);
-      }
+      document.addEventListener('mousedown', handleClickOutside);
     }
     
     return () => {
-      try {
-        document.removeEventListener('mousedown', handleClickOutside);
-      } catch (error) {
-        console.error('RelayStatusModal: Error removing mousedown event listener:', error);
-      }
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen, onClose]);
   
   // Handle escape key to close
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
-      try {
-        if (event.key === 'Escape') {
-          onClose();
-        }
-      } catch (error) {
-        console.error('RelayStatusModal: Error handling escape key:', error);
+      if (event.key === 'Escape') {
+        onClose();
       }
     };
     
     if (isOpen) {
-      try {
-        document.addEventListener('keydown', handleEscKey);
-      } catch (error) {
-        console.error('RelayStatusModal: Error adding keydown event listener:', error);
-      }
+      document.addEventListener('keydown', handleEscKey);
     }
     
     return () => {
-      try {
-        document.removeEventListener('keydown', handleEscKey);
-      } catch (error) {
-        console.error('RelayStatusModal: Error removing keydown event listener:', error);
-      }
+      document.removeEventListener('keydown', handleEscKey);
     };
   }, [isOpen, onClose]);
   
@@ -131,6 +118,27 @@ const RelayStatusModal: React.FC<RelayStatusModalProps> = ({ isOpen, onClose, re
         
         <div className="mt-4 text-center text-sm text-gray-400">
           {connectedRelays.length} of {safeRelayUrls.length} relays connected
+        </div>
+        
+        {/* Connection control buttons */}
+        <div className="mt-4 flex justify-center space-x-4">
+          {status === 'connected' && onDisconnect && (
+            <button
+              onClick={onDisconnect}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+            >
+              Disconnect
+            </button>
+          )}
+          
+          {(status === 'disconnected' || status === 'error') && onReconnect && (
+            <button
+              onClick={onReconnect}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+            >
+              Reconnect
+            </button>
+          )}
         </div>
       </div>
     </div>

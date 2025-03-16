@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Blob Upload</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .card {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .button {
+      background-color: #4CAF50;
+      border: none;
+      color: white;
+      padding: 10px 20px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+      margin: 4px 2px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .result {
+      background-color: #f5f5f5;
+      padding: 10px;
+      border-radius: 4px;
+      white-space: pre-wrap;
+    }
+    .error {
+      color: red;
+    }
+    .success {
+      color: green;
+    }
+    img {
+      max-width: 100%;
+      max-height: 300px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Test Vercel Blob Upload</h1>
+  
+  <div class="container">
+    <div class="card">
+      <h2>1. Test Simple Text Upload</h2>
+      <p>This will test if the Vercel Blob API is working correctly with a simple text file.</p>
+      <button id="testSimpleButton" class="button">Run Simple Test</button>
+      <div id="simpleResult" class="result"></div>
+    </div>
+    
+    <div class="card">
+      <h2>2. Test Image Upload</h2>
+      <p>This will test uploading an image file to Vercel Blob.</p>
+      <input type="file" id="imageInput" accept="image/*">
+      <button id="uploadImageButton" class="button">Upload Image</button>
+      <div id="imageResult" class="result"></div>
+      <div id="imagePreview"></div>
+    </div>
+  </div>
+
+  <script>
+    // Test simple text upload
+    document.getElementById('testSimpleButton').addEventListener('click', async () => {
+      const resultDiv = document.getElementById('simpleResult');
+      resultDiv.innerHTML = 'Testing...';
+      
+      try {
+        const response = await fetch('/api/test-blob');
+        const data = await response.json();
+        
+        if (data.success) {
+          resultDiv.innerHTML = `<span class="success">Success!</span>\n\nFile uploaded to: <a href="${data.url}" target="_blank">${data.url}</a>\n\nContent: ${data.content}`;
+        } else {
+          resultDiv.innerHTML = `<span class="error">Error:</span> ${data.error || 'Unknown error'}`;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `<span class="error">Error:</span> ${error.message}`;
+        console.error('Error testing blob upload:', error);
+      }
+    });
+    
+    // Test image upload
+    document.getElementById('uploadImageButton').addEventListener('click', async () => {
+      const fileInput = document.getElementById('imageInput');
+      const resultDiv = document.getElementById('imageResult');
+      const previewDiv = document.getElementById('imagePreview');
+      
+      if (!fileInput.files || fileInput.files.length === 0) {
+        resultDiv.innerHTML = '<span class="error">Please select an image file first</span>';
+        return;
+      }
+      
+      const file = fileInput.files[0];
+      resultDiv.innerHTML = `Uploading ${file.name} (${file.type}, ${file.size} bytes)...`;
+      
+      try {
+        // Convert file to base64
+        const fileData = await readFileAsDataURL(file);
+        
+        // Send to our API
+        const response = await fetch('/api/blob-upload', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            file: {
+              data: fileData,
+              type: file.type,
+              name: file.name
+            },
+            imageType: 'test',
+            topicId: 'test'
+          }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.url) {
+          resultDiv.innerHTML = `<span class="success">Success!</span>\n\nImage uploaded to: <a href="${data.url}" target="_blank">${data.url}</a>`;
+          previewDiv.innerHTML = `<img src="${data.url}" alt="Uploaded image">`;
+        } else {
+          resultDiv.innerHTML = `<span class="error">Error:</span> ${data.error || 'Unknown error'}\n\nDetails: ${JSON.stringify(data, null, 2)}`;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `<span class="error">Error:</span> ${error.message}`;
+        console.error('Error uploading image:', error);
+      }
+    });
+    
+    // Helper function to read file as data URL
+    function readFileAsDataURL(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+  </script>
+</body>
+</html>

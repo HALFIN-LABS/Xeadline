@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple Image Upload Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #121212;
+      color: #e0e0e0;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .card {
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 20px;
+      background-color: #1e1e1e;
+    }
+    .button {
+      background-color: #4CAF50;
+      border: none;
+      color: white;
+      padding: 10px 20px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+      margin: 4px 2px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .result {
+      background-color: #2a2a2a;
+      padding: 10px;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      margin-top: 20px;
+    }
+    .error {
+      color: #ff6b6b;
+    }
+    .success {
+      color: #69f0ae;
+    }
+    img {
+      max-width: 100%;
+      max-height: 300px;
+      margin-top: 20px;
+    }
+    a {
+      color: #64b5f6;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <h1>Simple Image Upload Test</h1>
+  <p>This page uses a different approach with FormData instead of JSON/base64.</p>
+  
+  <div class="container">
+    <div class="card">
+      <h2>Upload Image</h2>
+      <form id="uploadForm" enctype="multipart/form-data">
+        <div>
+          <label for="fileInput">Select an image file:</label>
+          <input type="file" id="fileInput" name="file" accept="image/*" required>
+        </div>
+        <button type="submit" class="button">Upload Image</button>
+      </form>
+      <div id="result" class="result" style="display: none;"></div>
+      <div id="preview"></div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const fileInput = document.getElementById('fileInput');
+      const resultDiv = document.getElementById('result');
+      const previewDiv = document.getElementById('preview');
+      
+      if (!fileInput.files || fileInput.files.length === 0) {
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = '<span class="error">Please select an image file first</span>';
+        return;
+      }
+      
+      const file = fileInput.files[0];
+      resultDiv.style.display = 'block';
+      resultDiv.innerHTML = `Uploading ${file.name} (${file.type}, ${file.size} bytes)...`;
+      previewDiv.innerHTML = '';
+      
+      try {
+        // Create a FormData object
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Create a local preview
+        const localPreviewUrl = URL.createObjectURL(file);
+        const localPreview = document.createElement('div');
+        localPreview.innerHTML = `
+          <h3>Local Preview:</h3>
+          <img src="${localPreviewUrl}" alt="Local preview">
+        `;
+        previewDiv.appendChild(localPreview);
+        
+        // Send the form data to the API
+        console.log('Sending request to /api/simple-blob-upload');
+        const response = await fetch('/api/simple-blob-upload', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        console.log('Response status:', response.status, response.statusText);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Server returned ${response.status}: ${errorText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Response data:', data);
+        
+        if (data.url) {
+          resultDiv.innerHTML = `<span class="success">Success!</span>\n\nImage uploaded to: <a href="${data.url}" target="_blank">${data.url}</a>`;
+          
+          // Add the uploaded image preview
+          const uploadedPreview = document.createElement('div');
+          uploadedPreview.innerHTML = `
+            <h3>Uploaded Image:</h3>
+            <img src="${data.url}" alt="Uploaded image">
+            <p>URL: ${data.url}</p>
+          `;
+          previewDiv.appendChild(uploadedPreview);
+        } else {
+          resultDiv.innerHTML = `<span class="error">Error:</span> No URL returned\n\nDetails: ${JSON.stringify(data, null, 2)}`;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `<span class="error">Error:</span> ${error.message}`;
+        console.error('Error uploading image:', error);
+      }
+    });
+  </script>
+</body>
+</html>

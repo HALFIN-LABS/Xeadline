@@ -19,13 +19,16 @@ export const FeatureFlags = {
     // Enable subscribing to events from relays (requires enableConnection)
     enableSubscriptions: true,
     
+    // Enable topic subscription synchronization (requires enableConnection)
+    enableSubscriptionSync: true,
+    
     // Enable automatic reconnection on connection loss
     enableAutoReconnect: true,
   },
 };
 
 // Helper functions for checking feature flags
-export const isFeatureEnabled = (featurePath: string): boolean => {
+export const isFeatureEnabled = (featurePath: string, defaultValue: boolean = false): boolean => {
   try {
     // Split the feature path by dots (e.g., "nostr.enableConnection")
     const parts = featurePath.split('.');
@@ -36,8 +39,8 @@ export const isFeatureEnabled = (featurePath: string): boolean => {
     // Navigate through the parts
     for (const part of parts) {
       if (current[part] === undefined) {
-        console.warn(`Feature flag "${featurePath}" not found`);
-        return false;
+        console.warn(`Feature flag "${featurePath}" not found, using default value: ${defaultValue}`);
+        return defaultValue;
       }
       current = current[part];
     }
@@ -46,7 +49,7 @@ export const isFeatureEnabled = (featurePath: string): boolean => {
     return Boolean(current);
   } catch (error) {
     console.error(`Error checking feature flag "${featurePath}":`, error);
-    return false;
+    return defaultValue;
   }
 };
 
