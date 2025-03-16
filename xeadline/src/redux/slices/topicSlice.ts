@@ -598,14 +598,33 @@ export const subscribeToTopic = createAsyncThunk(
         signedEvent = await window.nostr.signEvent(event);
       } else if (privateKey) {
         // Use provided private key
-        const pubkey = getPublicKey(hexToBytes(privateKey));
-        event.pubkey = pubkey;
+        console.log('Using provided private key for signing', {
+          privateKeyLength: privateKey.length,
+          privateKeyType: typeof privateKey,
+          privateKeyStart: privateKey.substring(0, 4) + '...',
+          isHex: /^[0-9a-f]{64}$/i.test(privateKey)
+        });
         
-        // Sign the event
-        event.id = getEventHash(event);
-        const sig = schnorr.sign(event.id, hexToBytes(privateKey));
-        event.sig = Buffer.from(sig).toString('hex');
-        signedEvent = event;
+        try {
+          const pubkey = getPublicKey(hexToBytes(privateKey));
+          event.pubkey = pubkey;
+          
+          // Sign the event
+          event.id = getEventHash(event);
+          console.log('Event hash generated:', event.id);
+          
+          const privateKeyBytes = hexToBytes(privateKey);
+          console.log('Private key converted to bytes, length:', privateKeyBytes.length);
+          
+          const sig = schnorr.sign(event.id, privateKeyBytes);
+          event.sig = Buffer.from(sig).toString('hex');
+          console.log('Event signed successfully, signature length:', event.sig.length);
+          
+          signedEvent = event;
+        } catch (error) {
+          console.error('Error during signing process:', error);
+          return rejectWithValue(`Signing error: ${error instanceof Error ? error.message : String(error)}`);
+        }
       } else {
         return rejectWithValue('No signing method available');
       }
@@ -698,14 +717,33 @@ export const unsubscribeFromTopic = createAsyncThunk(
         signedEvent = await window.nostr.signEvent(event);
       } else if (privateKey) {
         // Use provided private key
-        const pubkey = getPublicKey(hexToBytes(privateKey));
-        event.pubkey = pubkey;
+        console.log('Using provided private key for unsubscribe signing', {
+          privateKeyLength: privateKey.length,
+          privateKeyType: typeof privateKey,
+          privateKeyStart: privateKey.substring(0, 4) + '...',
+          isHex: /^[0-9a-f]{64}$/i.test(privateKey)
+        });
         
-        // Sign the event
-        event.id = getEventHash(event);
-        const sig = schnorr.sign(event.id, hexToBytes(privateKey));
-        event.sig = Buffer.from(sig).toString('hex');
-        signedEvent = event;
+        try {
+          const pubkey = getPublicKey(hexToBytes(privateKey));
+          event.pubkey = pubkey;
+          
+          // Sign the event
+          event.id = getEventHash(event);
+          console.log('Unsubscribe event hash generated:', event.id);
+          
+          const privateKeyBytes = hexToBytes(privateKey);
+          console.log('Private key converted to bytes, length:', privateKeyBytes.length);
+          
+          const sig = schnorr.sign(event.id, privateKeyBytes);
+          event.sig = Buffer.from(sig).toString('hex');
+          console.log('Unsubscribe event signed successfully, signature length:', event.sig.length);
+          
+          signedEvent = event;
+        } catch (error) {
+          console.error('Error during unsubscribe signing process:', error);
+          return rejectWithValue(`Unsubscribe signing error: ${error instanceof Error ? error.message : String(error)}`);
+        }
       } else {
         return rejectWithValue('No signing method available');
       }

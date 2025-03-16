@@ -40,7 +40,10 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
       console.log('Subscribing to topic:', {
         topicId,
         hasPrivateKey: !!currentUser.privateKey,
-        userPublicKey: currentUser.publicKey
+        hasEncryptedPrivateKey: !!currentUser.encryptedPrivateKey,
+        userPublicKey: currentUser.publicKey,
+        privateKeyType: currentUser.privateKey ? typeof currentUser.privateKey : 'undefined',
+        privateKeyLength: currentUser.privateKey ? currentUser.privateKey.length : 0
       });
       
       try {
@@ -67,7 +70,10 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
       console.log('Unsubscribing from topic:', {
         topicId,
         hasPrivateKey: !!currentUser.privateKey,
-        userPublicKey: currentUser.publicKey
+        hasEncryptedPrivateKey: !!currentUser.encryptedPrivateKey,
+        userPublicKey: currentUser.publicKey,
+        privateKeyType: currentUser.privateKey ? typeof currentUser.privateKey : 'undefined',
+        privateKeyLength: currentUser.privateKey ? currentUser.privateKey.length : 0
       });
       
       try {
