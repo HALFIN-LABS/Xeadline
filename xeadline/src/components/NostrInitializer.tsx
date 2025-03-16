@@ -34,7 +34,7 @@ const NostrInitializer = () => {
       console.log('NostrInitializer: Initializing topic subscriptions');
       dispatch(initializeSubscriptions());
     }
-  }, [dispatch, subscriptionSyncEnabled]);
+  }, [dispatch, subscriptionSyncEnabled, isAuthenticated, currentUserPublicKey]);
   
   // Log initialization status
   useEffect(() => {

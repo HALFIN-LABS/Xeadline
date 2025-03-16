@@ -225,6 +225,24 @@ export const createTopic = createAsyncThunk(
           const publishedTo = await nostrService.publishEvent(signedSubscriptionEvent);
           console.log(`Published subscription event to ${publishedTo.length} relays`);
           
+          // Verify the subscription was published to at least one relay
+          if (publishedTo.length === 0) {
+            console.error('Failed to publish subscription to any relays. Retrying...');
+            
+            // Retry publishing the subscription event
+            for (let i = 0; i < 3; i++) {
+              console.log(`Retry attempt ${i + 1} to publish subscription...`);
+              const retryPublishedTo = await nostrService.publishEvent(signedSubscriptionEvent);
+              if (retryPublishedTo.length > 0) {
+                console.log(`Successfully published subscription on retry ${i + 1}`);
+                break;
+              }
+              
+              // Wait a bit before retrying
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          }
+          
           // Store subscription in local storage
           if (typeof window !== 'undefined') {
             try {
@@ -515,7 +533,18 @@ export const fetchUserSubscriptions = createAsyncThunk(
         .filter(([_, { subscribed }]) => subscribed)
         .map(([topicId]) => topicId);
       
-      console.log(`User is subscribed to ${subscribedTopicIds.length} topics`);
+      console.log(`User is subscribed to ${subscribedTopicIds.length} topics from Nostr`);
+      
+      // Update localStorage with the fetched subscriptions
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('topicSubscriptions', JSON.stringify(subscribedTopicIds));
+          console.log('Updated localStorage with subscriptions from Nostr');
+        } catch (e) {
+          console.error('Error updating localStorage with subscriptions:', e);
+        }
+      }
+      
       return subscribedTopicIds;
     } catch (error) {
       console.error('Error fetching user subscriptions:', error);
@@ -579,6 +608,30 @@ export const subscribeToTopic = createAsyncThunk(
       // Publish the event to relays
       const publishedTo = await nostrService.publishEvent(signedEvent);
       console.log(`Published subscription event to ${publishedTo.length} relays`);
+      
+      // Verify the subscription was published to at least one relay
+      if (publishedTo.length === 0) {
+        console.error('Failed to publish subscription to any relays. Retrying...');
+        
+        // Retry publishing the subscription event
+        let retrySuccess = false;
+        for (let i = 0; i < 3; i++) {
+          console.log(`Retry attempt ${i + 1} to publish subscription...`);
+          const retryPublishedTo = await nostrService.publishEvent(signedEvent);
+          if (retryPublishedTo.length > 0) {
+            console.log(`Successfully published subscription on retry ${i + 1}`);
+            retrySuccess = true;
+            break;
+          }
+          
+          // Wait a bit before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        if (!retrySuccess) {
+          console.error('All retry attempts failed. Subscription may not be properly synced.');
+        }
+      }
       
       // Store subscription in local storage for faster loading next time
       if (typeof window !== 'undefined') {
@@ -656,6 +709,30 @@ export const unsubscribeFromTopic = createAsyncThunk(
       const publishedTo = await nostrService.publishEvent(signedEvent);
       console.log(`Published unsubscription event to ${publishedTo.length} relays`);
       
+      // Verify the unsubscription was published to at least one relay
+      if (publishedTo.length === 0) {
+        console.error('Failed to publish unsubscription to any relays. Retrying...');
+        
+        // Retry publishing the unsubscription event
+        let retrySuccess = false;
+        for (let i = 0; i < 3; i++) {
+          console.log(`Retry attempt ${i + 1} to publish unsubscription...`);
+          const retryPublishedTo = await nostrService.publishEvent(signedEvent);
+          if (retryPublishedTo.length > 0) {
+            console.log(`Successfully published unsubscription on retry ${i + 1}`);
+            retrySuccess = true;
+            break;
+          }
+          
+          // Wait a bit before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        if (!retrySuccess) {
+          console.error('All retry attempts failed. Unsubscription may not be properly synced.');
+        }
+      }
+      
       // Remove subscription from local storage
       if (typeof window !== 'undefined') {
         try {
@@ -674,7 +751,7 @@ export const unsubscribeFromTopic = createAsyncThunk(
   }
 );
 
-// Initialize topic subscriptions from local storage
+// Initialize topic subscriptions from local storage and Nostr
 export const initializeSubscriptions = createAsyncThunk(
   'topic/initializeSubscriptions',
   async (_, { dispatch, getState }) => {
@@ -697,8 +774,21 @@ export const initializeSubscriptions = createAsyncThunk(
       const currentUser = state.auth.currentUser;
       
       if (currentUser?.publicKey) {
-        // Dispatch in the background, don't await
-        dispatch(fetchUserSubscriptions(currentUser.publicKey));
+        try {
+          console.log('Fetching subscriptions from Nostr for user:', currentUser.publicKey);
+          // Wait for Nostr subscriptions to be fetched
+          const nostrSubscriptions = await dispatch(fetchUserSubscriptions(currentUser.publicKey)).unwrap();
+          console.log(`Fetched ${nostrSubscriptions.length} subscriptions from Nostr`);
+          
+          // Return the Nostr subscriptions as they are more authoritative
+          return nostrSubscriptions;
+        } catch (error) {
+          console.error('Error fetching subscriptions from Nostr:', error);
+          // If Nostr fetch fails, fall back to local storage subscriptions
+          console.log('Falling back to local storage subscriptions');
+        }
+      } else {
+        console.log('User not authenticated, using only local storage subscriptions');
       }
       
       return subscriptions;
