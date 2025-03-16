@@ -10,6 +10,7 @@ import BrowserCheck from '@/components/BrowserCheck'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import ErrorHandler from '@/components/ErrorHandler'
 import Script from 'next/script'
+import { Analytics } from '@vercel/analytics/react'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </BrowserCheck>
           </ErrorBoundary>
         </Providers>
+        <Analytics />
       </body>
     </html>
   )
