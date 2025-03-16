@@ -101,26 +101,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log('No image data found for topic:', decodedId);
     }
 
-    // Try to fetch the topic content from the database
-    const { data: topicContentData, error: topicContentError } = await supabase
-      .from('topic_content')
-      .select('description, rules')
-      .eq('topic_id', decodedId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-      
-    // Use the description and rules from the database if available
-    const description = topicContentData?.description || 'This topic was created in development mode.';
-    const rules = topicContentData?.rules || ['Be respectful', 'Stay on topic'];
-    
-    // Create a topic with the real data if available
+    // Create a mock topic with the real images if available
     const topic = {
       id: decodedId,
       name: topicName,
       slug: dIdentifier,
-      description,
-      rules,
+      description: 'Topic content is loading or unavailable. Please refresh the page.',
+      rules: ['Be respectful', 'Stay on topic'],
       image: iconImageData?.image_path || `https://ui-avatars.com/api/?name=${encodeURIComponent(dIdentifier)}&background=random&size=128`,
       banner: bannerImageData?.image_path || `https://ui-avatars.com/api/?name=${encodeURIComponent(dIdentifier)}&background=718096&color=FFFFFF&size=300&width=1200&height=300`,
       moderators: [pubkey],

@@ -133,10 +133,10 @@ export const createTopic = createAsyncThunk(
         return rejectWithValue('No signing method available');
       }
       
-      // Publish the event
-      // For now, we'll just simulate publishing
-      // In a real implementation, you would use nostrService.publishEvent(signedEvent)
-      console.log('Publishing topic event:', signedEvent);
+      // Publish the event to Nostr relays
+      console.log('Publishing topic event to Nostr relays:', signedEvent);
+      const publishedTo = await nostrService.publishEvent(signedEvent);
+      console.log(`Published topic event to ${publishedTo.length} relays`);
       
       // Create the topic object
       const topic: Topic = {
@@ -187,11 +187,75 @@ export const fetchTopic = createAsyncThunk(
         return rejectWithValue('Invalid topic ID format');
       }
       
-      // Try to fetch the topic from the database first
+      // Try to fetch the topic from Nostr relays
+      console.log(`Fetching topic with ID: ${topicId} from Nostr relays`);
+      
+      // Create a filter to get the topic definition event
+      const filters: Filter[] = [
+        {
+          kinds: [34550], // NIP-72 topic definition
+          authors: [pubkey],
+          '#d': [dIdentifier],
+          limit: 1
+        }
+      ];
+      
+      // Fetch events from Nostr relays
+      const events = await nostrService.getEvents(filters);
+      console.log(`Found ${events.length} topic events`);
+      
+      if (events.length > 0) {
+        // Sort events by created_at to get the most recent one
+        const sortedEvents = events.sort((a, b) => b.created_at - a.created_at);
+        const topicEvent = sortedEvents[0];
+        
+        // Extract topic name from tags
+        const nameTag = topicEvent.tags.find(tag => tag[0] === 'name');
+        const name = nameTag ? nameTag[1] : `Topic ${dIdentifier}`;
+        
+        // Parse the topic content from the event content
+        let topicContent;
+        try {
+          topicContent = JSON.parse(topicEvent.content);
+          console.log('Parsed topic content:', topicContent);
+        } catch (error) {
+          console.error('Error parsing topic content:', error);
+          topicContent = {
+            description: 'Error parsing topic content',
+            rules: ['Be respectful', 'Stay on topic'],
+            moderationSettings: {
+              moderationType: 'post-publication'
+            }
+          };
+        }
+        
+        // Create the topic object from the event
+        const topic: Topic = {
+          id: topicId,
+          name,
+          slug: dIdentifier,
+          description: topicContent.description || 'No description provided',
+          rules: Array.isArray(topicContent.rules) ? topicContent.rules : ['Be respectful', 'Stay on topic'],
+          image: topicContent.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(dIdentifier)}&background=random&size=128`,
+          banner: topicContent.banner || `https://ui-avatars.com/api/?name=${encodeURIComponent(dIdentifier)}&background=718096&color=FFFFFF&size=300&width=1200&height=300`,
+          moderators: [pubkey],
+          createdAt: topicEvent.created_at,
+          pubkey,
+          moderationSettings: topicContent.moderationSettings || {
+            moderationType: 'post-publication'
+          },
+          memberCount: 10 // Placeholder, would need to count actual members
+        };
+        
+        console.log('Created topic object from Nostr event:', topic);
+        return topic;
+      }
+      
+      // If no topic events found, try to fetch from the database as fallback
       try {
         // Properly encode the topic ID for the URL
         const encodedTopicId = encodeURIComponent(topicId);
-        console.log('Fetching topic with ID:', encodedTopicId);
+        console.log('Fetching topic with ID from API:', encodedTopicId);
         
         const response = await fetch(`/api/topic/${encodedTopicId}`);
         if (response.ok) {
@@ -201,20 +265,13 @@ export const fetchTopic = createAsyncThunk(
           }
         } else {
           console.error('Error response from API:', response.status, response.statusText);
-          // Try to get more details about the error
-          try {
-            const errorData = await response.json();
-            console.error('Error details:', errorData);
-          } catch (e) {
-            // Ignore if we can't parse the error response
-          }
         }
       } catch (error) {
         console.error('Error fetching topic from API:', error);
-        // Continue with mock data if API fetch fails
       }
       
-      // Fall back to mock topic if API fetch fails
+      // Fall back to mock topic if all else fails
+      console.log('Falling back to mock topic');
       const mockTopic: Topic = {
         id: topicId,
         name: `Topic ${dIdentifier}`,
