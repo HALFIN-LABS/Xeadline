@@ -185,6 +185,64 @@ export const createTopic = createAsyncThunk(
         // Continue even if slug mapping fails
       }
       
+      // Automatically subscribe the creator to the topic
+      try {
+        console.log(`Auto-subscribing creator to topic: ${topic.id}`);
+        
+        // Create a subscription event
+        const subscriptionEvent: Event = {
+          kind: TOPIC_SUBSCRIPTION_KIND,
+          created_at: Math.floor(Date.now() / 1000),
+          tags: [
+            ['e', topic.id], // Topic ID
+            ['a', 'subscribe'], // Action
+            ['client', 'xeadline']
+          ],
+          content: '',
+          pubkey: signedEvent.pubkey,
+          id: '', // Will be filled in
+          sig: '' // Will be filled in
+        };
+        
+        // Sign the subscription event
+        let signedSubscriptionEvent: Event | null = null;
+        if (typeof window !== 'undefined' && window.nostr) {
+          // Use Nostr extension
+          signedSubscriptionEvent = await window.nostr.signEvent(subscriptionEvent);
+        } else if (privateKey) {
+          // Use provided private key
+          subscriptionEvent.id = getEventHash(subscriptionEvent);
+          const sig = schnorr.sign(subscriptionEvent.id, privateKey);
+          subscriptionEvent.sig = Buffer.from(sig).toString('hex');
+          signedSubscriptionEvent = subscriptionEvent;
+        } else {
+          console.error('No signing method available for subscription');
+          // Continue even if subscription fails
+        }
+        
+        // Publish the subscription event
+        if (signedSubscriptionEvent) {
+          const publishedTo = await nostrService.publishEvent(signedSubscriptionEvent);
+          console.log(`Published subscription event to ${publishedTo.length} relays`);
+          
+          // Store subscription in local storage
+          if (typeof window !== 'undefined') {
+            try {
+              const storedSubscriptions = JSON.parse(localStorage.getItem('topicSubscriptions') || '[]');
+              if (!storedSubscriptions.includes(topic.id)) {
+                storedSubscriptions.push(topic.id);
+                localStorage.setItem('topicSubscriptions', JSON.stringify(storedSubscriptions));
+              }
+            } catch (e) {
+              console.error('Error storing subscription in local storage:', e);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error auto-subscribing to topic:', error);
+        // Continue even if subscription fails
+      }
+      
       return topic;
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Failed to create topic');
