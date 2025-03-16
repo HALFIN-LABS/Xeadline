@@ -934,9 +934,164 @@ export const topicSlice = createSlice({
       // Unsubscribe from topic
       .addCase(unsubscribeFromTopic.fulfilled, (state, action) => {
         state.subscribed = state.subscribed.filter(id => id !== action.payload);
+      })
+      
+      // Update topic moderators
+      .addCase(updateTopicModerators.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateTopicModerators.fulfilled, (state, action) => {
+        state.loading = false;
+        // Update the topic in the store
+        state.byId[action.payload.id] = action.payload;
+      })
+      .addCase(updateTopicModerators.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
       });
   }
 });
+
+// Update topic moderators thunk
+export const updateTopicModerators = createAsyncThunk(
+  'topic/updateTopicModerators',
+  async (
+    {
+      topicId,
+      moderators,
+      privateKey
+    }: {
+      topicId: string;
+      moderators: string[]; // Array of pubkeys
+      privateKey?: string;
+    },
+    { rejectWithValue, getState }
+  ) => {
+    try {
+      const state = getState() as RootState;
+      const topic = state.topic.byId[topicId];
+      
+      if (!topic) {
+        return rejectWithValue('Topic not found');
+      }
+      
+      // Parse the topic ID to get pubkey and d-identifier
+      const [pubkey, dIdentifier] = topicId.split(':');
+      
+      if (!pubkey || !dIdentifier) {
+        return rejectWithValue('Invalid topic ID format');
+      }
+      
+      // Create the updated topic content
+      const topicContent = {
+        description: topic.description,
+        rules: topic.rules,
+        image: topic.image,
+        banner: topic.banner,
+        moderationSettings: topic.moderationSettings,
+        moderators: moderators
+      };
+      
+      // Create the topic update event
+      const event: Event = {
+        kind: 34550, // NIP-72 topic definition
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+          ['d', dIdentifier],
+          ['name', topic.name],
+          ['client', 'xeadline'],
+          ['xd', 'topic']
+        ],
+        content: JSON.stringify(topicContent),
+        pubkey: '', // Will be filled in
+        id: '', // Will be filled in
+        sig: '' // Will be filled in
+      };
+      
+      let signedEvent: Event;
+      
+      // Sign the event
+      if (typeof window !== 'undefined' && window.nostr) {
+        // Use Nostr extension
+        event.pubkey = await window.nostr.getPublicKey();
+        
+        // Verify that the current user is the topic creator
+        if (event.pubkey !== pubkey) {
+          return rejectWithValue('Only the topic creator can update moderators');
+        }
+        
+        signedEvent = await window.nostr.signEvent(event);
+      } else if (privateKey) {
+        // Use provided private key
+        const derivedPubkey = getPublicKey(hexToBytes(privateKey));
+        
+        // Verify that the current user is the topic creator
+        if (derivedPubkey !== pubkey) {
+          return rejectWithValue('Only the topic creator can update moderators');
+        }
+        
+        event.pubkey = derivedPubkey;
+        
+        // Sign the event
+        event.id = getEventHash(event);
+        const sig = schnorr.sign(event.id, privateKey);
+        event.sig = Buffer.from(sig).toString('hex');
+        signedEvent = event;
+      } else {
+        return rejectWithValue('No signing method available');
+      }
+      
+      // Publish the event to Nostr relays
+      console.log('Publishing topic update event to Nostr relays:', {
+        id: signedEvent.id,
+        pubkey: signedEvent.pubkey,
+        kind: signedEvent.kind,
+        created_at: signedEvent.created_at,
+        tags: signedEvent.tags,
+        content: signedEvent.content
+      });
+      
+      const publishedTo = await nostrService.publishEvent(signedEvent);
+      console.log(`Published topic update event to ${publishedTo.length} relays:`, publishedTo);
+      
+      // Verify the event was published to at least one relay
+      if (publishedTo.length === 0) {
+        console.error('Failed to publish to any relays. Retrying...');
+        
+        // Retry publishing the event
+        let retrySuccess = false;
+        for (let i = 0; i < 3; i++) {
+          console.log(`Retry attempt ${i + 1} to publish topic update...`);
+          const retryPublishedTo = await nostrService.publishEvent(signedEvent);
+          if (retryPublishedTo.length > 0) {
+            console.log(`Successfully published topic update on retry ${i + 1}`);
+            retrySuccess = true;
+            break;
+          }
+          
+          // Wait a bit before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        if (!retrySuccess) {
+          console.error('All retry attempts failed. Topic update may not be properly synced.');
+          return rejectWithValue('Failed to publish topic update to any relays');
+        }
+      }
+      
+      // Create the updated topic object
+      const updatedTopic: Topic = {
+        ...topic,
+        moderators: moderators
+      };
+      
+      return updatedTopic;
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Failed to update topic moderators');
+    }
+  }
+);
 
 // Export actions
 export const { setCurrentTopic, clearCurrentTopic, clearError } = topicSlice.actions;

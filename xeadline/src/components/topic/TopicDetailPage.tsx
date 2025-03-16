@@ -14,6 +14,7 @@ import {
 import { selectCurrentUser } from '../../redux/slices/authSlice';
 import Image from 'next/image';
 import Link from 'next/link';
+import TopicManagersButton from './TopicManagersButton';
 
 interface TopicDetailPageProps {
   topicId: string;
@@ -196,7 +197,13 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
             {/* Moderators */}
             {topic.moderators && topic.moderators.length > 0 && (
               <div className="mt-6">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Moderators</h2>
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Moderators</h2>
+                  {/* Only show the manage button if the user is a moderator */}
+                  {currentUser && topic.moderators.includes(currentUser.publicKey) && (
+                    <TopicManagersButton />
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {topic.moderators.map((moderator, index) => (
                     <Link 
