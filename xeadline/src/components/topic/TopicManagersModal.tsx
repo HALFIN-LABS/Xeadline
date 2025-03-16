@@ -83,14 +83,32 @@ export default function TopicManagersModal({ isOpen, onClose }: TopicManagersMod
     setIsUpdating(true);
     
     try {
-      await dispatch(updateTopicModerators({
+      console.log('Updating topic moderators:', {
         topicId: currentTopic.id,
-        moderators
+        moderatorsCount: moderators.length,
+        hasPrivateKey: !!currentUser?.privateKey
+      });
+      
+      const result = await dispatch(updateTopicModerators({
+        topicId: currentTopic.id,
+        moderators,
+        privateKey: currentUser?.privateKey
       })).unwrap();
       
+      console.log('Successfully updated topic moderators:', result);
       onClose();
     } catch (error) {
       console.error('Error updating topic managers:', error);
+      console.error('Current user:', currentUser ? {
+        publicKey: currentUser.publicKey,
+        hasPrivateKey: !!currentUser.privateKey
+      } : 'No current user');
+      console.error('Current topic:', currentTopic ? {
+        id: currentTopic.id,
+        pubkey: currentTopic.pubkey,
+        moderators: currentTopic.moderators
+      } : 'No current topic');
+      
       setError(typeof error === 'string' ? error : 'Failed to update topic managers');
     } finally {
       setIsUpdating(false);
