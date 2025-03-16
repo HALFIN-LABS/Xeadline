@@ -66,7 +66,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
 // POST: Create a new slug mapping
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
-  const { slug, topicId } = req.body;
+  const { slug, topicId, name } = req.body;
   
   if (!slug || !topicId) {
     return res.status(400).json({ error: 'Slug and topicId are required' });
@@ -87,9 +87,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   const { data, error } = await supabase
     .from('topic_slugs')
     .insert([
-      { 
-        slug: slug.toLowerCase(), 
+      {
+        slug: slug.toLowerCase(),
         topic_id: topicId,
+        name: name || slug.split('-').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' '), // Capitalize each word if name not provided
         created_at: new Date().toISOString()
       }
     ])

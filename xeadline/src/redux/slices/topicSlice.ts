@@ -1,8 +1,9 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit';
 import { RootState } from '../store';
-import { Event, getEventHash } from 'nostr-tools';
+import { Event, getEventHash, Filter } from 'nostr-tools';
 import { hexToBytes } from '@noble/hashes/utils';
 import { schnorr } from '@noble/curves/secp256k1';
+import nostrService from '../../services/nostr/nostrService';
 
 // Define types
 export interface Topic {
@@ -186,14 +187,42 @@ export const fetchTopic = createAsyncThunk(
         return rejectWithValue('Invalid topic ID format');
       }
       
-      // For now, we'll just return a mock topic
-      // In a real implementation, you would fetch from Nostr relays
+      // Try to fetch the topic from the database first
+      try {
+        // Properly encode the topic ID for the URL
+        const encodedTopicId = encodeURIComponent(topicId);
+        console.log('Fetching topic with ID:', encodedTopicId);
+        
+        const response = await fetch(`/api/topic/${encodedTopicId}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.topic) {
+            return data.topic;
+          }
+        } else {
+          console.error('Error response from API:', response.status, response.statusText);
+          // Try to get more details about the error
+          try {
+            const errorData = await response.json();
+            console.error('Error details:', errorData);
+          } catch (e) {
+            // Ignore if we can't parse the error response
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching topic from API:', error);
+        // Continue with mock data if API fetch fails
+      }
+      
+      // Fall back to mock topic if API fetch fails
       const mockTopic: Topic = {
         id: topicId,
         name: `Topic ${dIdentifier}`,
         slug: dIdentifier,
         description: 'This is a mock topic for development purposes.',
         rules: ['Be respectful', 'Stay on topic'],
+        image: `https://ui-avatars.com/api/?name=${encodeURIComponent(dIdentifier)}&background=random&size=128`,
+        banner: `https://ui-avatars.com/api/?name=${encodeURIComponent(dIdentifier)}&background=718096&color=FFFFFF&size=300&width=1200&height=300`,
         moderators: [pubkey],
         createdAt: Math.floor(Date.now() / 1000) - 86400, // 1 day ago
         pubkey,
@@ -267,6 +296,64 @@ export const fetchNewTopics = createAsyncThunk(
     }
   }
 );
+// Define Nostr event kind for topic subscriptions
+const TOPIC_SUBSCRIPTION_KIND = 34551; // NIP-72 topic subscription
+
+// Fetch user's topic subscriptions
+export const fetchUserSubscriptions = createAsyncThunk(
+  'topic/fetchUserSubscriptions',
+  async (pubkey: string, { rejectWithValue }) => {
+    try {
+      console.log(`Fetching topic subscriptions for user: ${pubkey}`);
+      
+      // Create a filter to get all topic subscription events for this user
+      const filters: Filter[] = [
+        {
+          kinds: [TOPIC_SUBSCRIPTION_KIND],
+          authors: [pubkey],
+          limit: 100
+        }
+      ];
+      
+      // Fetch events from Nostr relays
+      const events = await nostrService.getEvents(filters);
+      console.log(`Found ${events.length} subscription events`);
+      
+      // Process events to get subscribed topic IDs
+      // The most recent event for each topic ID determines the subscription status
+      const subscriptionMap = new Map<string, { subscribed: boolean, timestamp: number }>();
+      
+      events.forEach((event: Event) => {
+        // Extract topic ID from the event tags
+        const topicTag = event.tags.find((tag: string[]) => tag[0] === 'e');
+        if (!topicTag || !topicTag[1]) return;
+        
+        const topicId = topicTag[1];
+        const timestamp = event.created_at;
+        
+        // Check if this is a subscription or unsubscription event
+        const action = event.tags.find((tag: string[]) => tag[0] === 'a')?.[1];
+        const subscribed = action === 'subscribe';
+        
+        // Only update if this is a more recent event
+        if (!subscriptionMap.has(topicId) || subscriptionMap.get(topicId)!.timestamp < timestamp) {
+          subscriptionMap.set(topicId, { subscribed, timestamp });
+        }
+      });
+      
+      // Get the list of currently subscribed topic IDs
+      const subscribedTopicIds = Array.from(subscriptionMap.entries())
+        .filter(([_, { subscribed }]) => subscribed)
+        .map(([topicId]) => topicId);
+      
+      console.log(`User is subscribed to ${subscribedTopicIds.length} topics`);
+      return subscribedTopicIds;
+    } catch (error) {
+      console.error('Error fetching user subscriptions:', error);
+      return rejectWithValue(error instanceof Error ? error.message : 'Failed to fetch user subscriptions');
+    }
+  }
+);
 
 // Subscribe to topic thunk
 export const subscribeToTopic = createAsyncThunk(
@@ -282,9 +369,61 @@ export const subscribeToTopic = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      // For now, we'll just return the topic ID
-      // In a real implementation, you would publish a subscription event to Nostr relays
       console.log(`Subscribing to topic: ${topicId}`);
+      
+      // Create a subscription event
+      const event: Event = {
+        kind: TOPIC_SUBSCRIPTION_KIND,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+          ['e', topicId], // Topic ID
+          ['a', 'subscribe'], // Action
+          ['client', 'xeadline']
+        ],
+        content: '',
+        pubkey: '', // Will be filled in
+        id: '', // Will be filled in
+        sig: '' // Will be filled in
+      };
+      
+      let signedEvent: Event;
+      
+      // Sign the event
+      if (typeof window !== 'undefined' && window.nostr) {
+        // Use Nostr extension
+        event.pubkey = await window.nostr.getPublicKey();
+        signedEvent = await window.nostr.signEvent(event);
+      } else if (privateKey) {
+        // Use provided private key
+        const pubkey = getPublicKey(hexToBytes(privateKey));
+        event.pubkey = pubkey;
+        
+        // Sign the event
+        event.id = getEventHash(event);
+        const sig = schnorr.sign(event.id, privateKey);
+        event.sig = Buffer.from(sig).toString('hex');
+        signedEvent = event;
+      } else {
+        return rejectWithValue('No signing method available');
+      }
+      
+      // Publish the event to relays
+      const publishedTo = await nostrService.publishEvent(signedEvent);
+      console.log(`Published subscription event to ${publishedTo.length} relays`);
+      
+      // Store subscription in local storage for faster loading next time
+      if (typeof window !== 'undefined') {
+        try {
+          const storedSubscriptions = JSON.parse(localStorage.getItem('topicSubscriptions') || '[]');
+          if (!storedSubscriptions.includes(topicId)) {
+            storedSubscriptions.push(topicId);
+            localStorage.setItem('topicSubscriptions', JSON.stringify(storedSubscriptions));
+          }
+        } catch (e) {
+          console.error('Error storing subscription in local storage:', e);
+        }
+      }
+      
       return topicId;
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Failed to subscribe to topic');
@@ -306,12 +445,97 @@ export const unsubscribeFromTopic = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      // For now, we'll just return the topic ID
-      // In a real implementation, you would publish an unsubscription event to Nostr relays
       console.log(`Unsubscribing from topic: ${topicId}`);
+      
+      // Create an unsubscription event
+      const event: Event = {
+        kind: TOPIC_SUBSCRIPTION_KIND,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+          ['e', topicId], // Topic ID
+          ['a', 'unsubscribe'], // Action
+          ['client', 'xeadline']
+        ],
+        content: '',
+        pubkey: '', // Will be filled in
+        id: '', // Will be filled in
+        sig: '' // Will be filled in
+      };
+      
+      let signedEvent: Event;
+      
+      // Sign the event
+      if (typeof window !== 'undefined' && window.nostr) {
+        // Use Nostr extension
+        event.pubkey = await window.nostr.getPublicKey();
+        signedEvent = await window.nostr.signEvent(event);
+      } else if (privateKey) {
+        // Use provided private key
+        const pubkey = getPublicKey(hexToBytes(privateKey));
+        event.pubkey = pubkey;
+        
+        // Sign the event
+        event.id = getEventHash(event);
+        const sig = schnorr.sign(event.id, privateKey);
+        event.sig = Buffer.from(sig).toString('hex');
+        signedEvent = event;
+      } else {
+        return rejectWithValue('No signing method available');
+      }
+      
+      // Publish the event to relays
+      const publishedTo = await nostrService.publishEvent(signedEvent);
+      console.log(`Published unsubscription event to ${publishedTo.length} relays`);
+      
+      // Remove subscription from local storage
+      if (typeof window !== 'undefined') {
+        try {
+          const storedSubscriptions = JSON.parse(localStorage.getItem('topicSubscriptions') || '[]');
+          const updatedSubscriptions = storedSubscriptions.filter((id: string) => id !== topicId);
+          localStorage.setItem('topicSubscriptions', JSON.stringify(updatedSubscriptions));
+        } catch (e) {
+          console.error('Error removing subscription from local storage:', e);
+        }
+      }
+      
       return topicId;
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Failed to unsubscribe from topic');
+    }
+  }
+);
+
+// Initialize topic subscriptions from local storage
+export const initializeSubscriptions = createAsyncThunk(
+  'topic/initializeSubscriptions',
+  async (_, { dispatch, getState }) => {
+    try {
+      console.log('Initializing topic subscriptions');
+      
+      // First try to load from local storage for immediate UI update
+      let subscriptions: string[] = [];
+      if (typeof window !== 'undefined') {
+        try {
+          subscriptions = JSON.parse(localStorage.getItem('topicSubscriptions') || '[]');
+          console.log(`Loaded ${subscriptions.length} subscriptions from local storage`);
+        } catch (e) {
+          console.error('Error loading subscriptions from local storage:', e);
+        }
+      }
+      
+      // Then try to fetch from Nostr relays if user is authenticated
+      const state = getState() as RootState;
+      const currentUser = state.auth.currentUser;
+      
+      if (currentUser?.publicKey) {
+        // Dispatch in the background, don't await
+        dispatch(fetchUserSubscriptions(currentUser.publicKey));
+      }
+      
+      return subscriptions;
+    } catch (error) {
+      console.error('Error initializing subscriptions:', error);
+      return [];
     }
   }
 );
@@ -417,6 +641,30 @@ export const topicSlice = createSlice({
         state.error = action.payload as string;
       })
       
+      // Initialize subscriptions
+      .addCase(initializeSubscriptions.fulfilled, (state, action) => {
+        // Replace the subscribed array with the loaded subscriptions
+        state.subscribed = action.payload;
+      })
+      
+      // Fetch user subscriptions
+      .addCase(fetchUserSubscriptions.fulfilled, (state, action) => {
+        // Merge with existing subscriptions to avoid duplicates
+        const newSubscriptions = action.payload.filter(id => !state.subscribed.includes(id));
+        if (newSubscriptions.length > 0) {
+          state.subscribed = [...state.subscribed, ...newSubscriptions];
+          
+          // Update local storage
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('topicSubscriptions', JSON.stringify(state.subscribed));
+            } catch (e) {
+              console.error('Error updating local storage with subscriptions:', e);
+            }
+          }
+        }
+      })
+      
       // Subscribe to topic
       .addCase(subscribeToTopic.fulfilled, (state, action) => {
         if (!state.subscribed.includes(action.payload)) {
@@ -433,8 +681,6 @@ export const topicSlice = createSlice({
 
 // Export actions
 export const { setCurrentTopic, clearCurrentTopic, clearError } = topicSlice.actions;
-
-import { createSelector } from '@reduxjs/toolkit';
 
 // Basic selectors
 export const selectTopics = (state: RootState) => state.topic.byId;

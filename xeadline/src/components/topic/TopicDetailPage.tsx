@@ -78,7 +78,7 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
   
   // Generate a placeholder image if none is provided
   const imageUrl = topic.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(topic.name)}&background=random&size=128`;
-  const bannerUrl = topic.banner || 'https://via.placeholder.com/1200x300/718096/FFFFFF?text=';
+  const bannerUrl = topic.banner || `https://ui-avatars.com/api/?name=${encodeURIComponent(topic.name)}&background=718096&color=FFFFFF&size=300&width=1200&height=300`;
   
   // Format member count
   const formattedMemberCount = topic.memberCount ? 
@@ -104,15 +104,14 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
         {/* Banner */}
         <div className="relative h-48 bg-gray-200 dark:bg-gray-700">
-          {topic.banner && (
-            <Image
-              src={bannerUrl}
-              alt={`${topic.name} banner`}
-              fill
-              className="object-cover"
-              sizes="100vw"
-            />
-          )}
+          <Image
+            src={bannerUrl}
+            alt={`${topic.name} banner`}
+            fill
+            priority
+            className="object-cover"
+            sizes="100vw"
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
         </div>
         

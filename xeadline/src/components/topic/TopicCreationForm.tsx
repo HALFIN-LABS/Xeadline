@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import { createTopic, selectTopicLoading, selectTopicError } from '../../redux/slices/topicSlice';
 import { selectCurrentUser } from '../../redux/slices/authSlice';
 import { generateSlug, isSlugAvailable, generateUniqueSlug } from '../../services/topicSlugService';
+import ImageUpload from '../ui/ImageUpload';
 
 interface TopicCreationFormProps {
   onSuccess?: (topicId: string, slug: string) => void;
@@ -31,6 +32,7 @@ export default function TopicCreationForm({ onSuccess, onCancel }: TopicCreation
   const [autoApproveAfter, setAutoApproveAfter] = useState(5);
   const [requireLightningDeposit, setRequireLightningDeposit] = useState(false);
   const [depositAmount, setDepositAmount] = useState(100);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   
   // Generate slug from name
   useEffect(() => {
@@ -121,6 +123,45 @@ export default function TopicCreationForm({ onSuccess, onCancel }: TopicCreation
       }));
       
       if (createTopic.fulfilled.match(resultAction)) {
+        // Create slug mapping in the database with the topic name
+        try {
+          await fetch('/api/topic/slug', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              slug: finalSlug,
+              topicId: resultAction.payload.id,
+              name: name // Include the topic name
+            }),
+          });
+        } catch (error) {
+          console.error('Error creating slug mapping:', error);
+          // Continue even if slug mapping fails
+        }
+        
+        // Save image metadata to database if images were uploaded
+        if (image || banner) {
+          try {
+            await fetch('/api/topic/save-images', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                topicId: resultAction.payload.id,
+                iconUrl: image,
+                bannerUrl: banner,
+                createdBy: currentUser?.publicKey
+              }),
+            });
+          } catch (error) {
+            console.error('Error saving topic images:', error);
+            // Continue even if image saving fails
+          }
+        }
+        
         if (onSuccess) {
           onSuccess(resultAction.payload.id, resultAction.payload.slug);
         }
@@ -130,6 +171,20 @@ export default function TopicCreationForm({ onSuccess, onCancel }: TopicCreation
     }
   };
   
+  const handleImageUploaded = (type: 'icon' | 'banner', url: string) => {
+    if (type === 'icon') {
+      setImage(url);
+    } else {
+      setBanner(url);
+    }
+    setUploadError(null);
+  };
+  
+  const handleImageError = (error: string) => {
+    setUploadError(error);
+  };
+  
+  
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
       <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Create a New Topic</h2>
@@ -137,6 +192,12 @@ export default function TopicCreationForm({ onSuccess, onCancel }: TopicCreation
       {error && (
         <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-md">
           {error}
+        </div>
+      )}
+      
+      {uploadError && (
+        <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-md">
+          {uploadError}
         </div>
       )}
       
@@ -259,31 +320,25 @@ export default function TopicCreationForm({ onSuccess, onCancel }: TopicCreation
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Topic Image */}
           <div>
-            <label htmlFor="image" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Topic Image URL
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Topic Icon
             </label>
-            <input
-              id="image"
-              type="url"
-              value={image}
-              onChange={(e) => setImage(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-bottle-green focus:border-bottle-green dark:bg-gray-700 dark:text-white"
-              placeholder="https://example.com/image.jpg"
+            <ImageUpload
+              imageType="icon"
+              onImageUploaded={(url: string) => handleImageUploaded('icon', url)}
+              existingImageUrl={image}
             />
           </div>
           
           {/* Banner Image */}
           <div>
-            <label htmlFor="banner" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Banner Image URL
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Banner Image
             </label>
-            <input
-              id="banner"
-              type="url"
-              value={banner}
-              onChange={(e) => setBanner(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-bottle-green focus:border-bottle-green dark:bg-gray-700 dark:text-white"
-              placeholder="https://example.com/banner.jpg"
+            <ImageUpload
+              imageType="banner"
+              onImageUploaded={(url: string) => handleImageUploaded('banner', url)}
+              existingImageUrl={banner}
             />
           </div>
         </div>

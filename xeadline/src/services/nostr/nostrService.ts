@@ -8,12 +8,7 @@ const DEFAULT_RELAYS = [
   'wss://nos.lol',
   'wss://relay.snort.social',
   'wss://nostr.wine',
-  'wss://relay.current.fyi',
-  'wss://purplepag.es',
-  'wss://relay.nostr.info',
-  'wss://nostr.fmt.wiz.biz',
-  'wss://relay.nostr.bg',
-  'wss://nostr.zebedee.cloud'
+  'wss://purplepag.es'
 ];
 
 // Define types
