@@ -762,21 +762,27 @@ export async function fetchUserActivity(publicKey: string, limit: number = 20): 
 }
 
 /**
- * Uploads an image to a hosting service and returns the URL
- * 
+ * Uploads an image to Vercel Blob storage and returns the URL
+ *
  * @param file - The image file to upload
  * @returns Promise resolving to the image URL
  */
 export async function uploadProfileImage(file: File): Promise<string> {
-  // In a real implementation, this would upload to an image hosting service
-  // For this MVP, we'll use a mock implementation that returns a data URL
-  
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      resolve(reader.result as string);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+  try {
+    // Import the uploadToBlob function dynamically to avoid circular dependencies
+    const { uploadToBlob } = await import('../lib/blob');
+    
+    // Upload the image to Vercel Blob storage
+    const imageUrl = await uploadToBlob(file, 'icon');
+    return imageUrl;
+  } catch (error) {
+    console.error('Error uploading profile image:', error);
+    
+    // Fallback to a placeholder image if upload fails
+    if (process.env.NODE_ENV === 'development') {
+      return 'https://ui-avatars.com/api/?name=Placeholder&background=random&size=128';
+    }
+    
+    throw error;
+  }
 }

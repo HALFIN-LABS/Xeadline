@@ -26,24 +26,41 @@ export default function ImageUpload({
     const file = e.target.files?.[0];
     if (!file) return;
     
+    // Reset previous errors
+    setError(null);
+    
     // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setError('Please upload an image file');
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setError(`Invalid file type: ${file.type}. Only JPEG, PNG, GIF, and WebP are allowed.`);
       return;
     }
     
     // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image must be less than 5MB');
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      setError(`File too large: ${(file.size / 1024 / 1024).toFixed(2)}MB. Maximum size is 5MB.`);
       return;
     }
     
-    setError(null);
     setUploading(true);
     
     try {
+      console.log(`Uploading ${file.name} (${file.type}, ${file.size} bytes)`);
+      
+      // Create a local preview first
+      try {
+        const localPreviewUrl = URL.createObjectURL(file);
+        setPreviewUrl(localPreviewUrl);
+      } catch (previewErr) {
+        console.error('Error creating local preview:', previewErr);
+        // Continue even if preview fails
+      }
+      
       // Use the blob utility function to upload the file
       const url = await uploadToBlob(file, imageType, topicId);
+      
+      console.log('Upload successful, URL:', url);
       
       // Set preview and notify parent
       setPreviewUrl(url);
@@ -51,7 +68,13 @@ export default function ImageUpload({
       
     } catch (err) {
       console.error('Error uploading image:', err);
-      setError('Failed to upload image. Please try again.');
+      
+      // Show a more detailed error message
+      if (err instanceof Error) {
+        setError(`Upload failed: ${err.message}`);
+      } else {
+        setError('Failed to upload image. Please try again.');
+      }
     } finally {
       setUploading(false);
     }
@@ -67,10 +90,14 @@ export default function ImageUpload({
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           {imageType === 'icon' ? 'Topic Icon' : 'Banner Image'}
         </label>
-        {error && (
-          <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
-        )}
       </div>
+      
+      {/* Error message with more visibility */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-2 mb-2">
+          <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+        </div>
+      )}
       
       <div className="flex items-center space-x-4">
         {/* Preview */}
