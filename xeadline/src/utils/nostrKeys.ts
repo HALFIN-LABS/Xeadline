@@ -167,7 +167,21 @@ declare global {
   interface Window {
     nostr?: {
       getPublicKey(): Promise<string>
-      signEvent(event: any): Promise<any>
+      signEvent(event: {
+        kind: number;
+        created_at: number;
+        tags: string[][];
+        content: string;
+        pubkey: string;
+      }): Promise<{
+        id: string;
+        pubkey: string;
+        created_at: number;
+        kind: number;
+        tags: string[][];
+        content: string;
+        sig: string;
+      }>
     }
   }
 }

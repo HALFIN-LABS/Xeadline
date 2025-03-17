@@ -5,6 +5,7 @@ import testReducer from './slices/testSlice'
 import authReducer from './slices/authSlice'
 import profileReducer from './slices/profileSlice'
 import topicReducer from './slices/topicSlice'
+import eventReducer from './slices/eventSlice'
 
 export const rootReducer = combineReducers({
   // Add reducers
@@ -13,4 +14,5 @@ export const rootReducer = combineReducers({
   auth: authReducer,
   profile: profileReducer,
   topic: topicReducer,
+  event: eventReducer,
 })

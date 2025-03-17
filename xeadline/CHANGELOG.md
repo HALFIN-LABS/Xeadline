@@ -5,6 +5,28 @@ All notable changes to the Xeadline project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Centralized event signing architecture:
+  - Created dedicated event signing service with support for multiple authentication methods
+  - Added timeout handling for extension signing to prevent hanging
+  - Implemented consistent password prompting for encrypted private keys
+  - Added comprehensive error handling and retry mechanisms
+  - Created Redux integration for event signing state management
+  - Added new components for event signing with both hook and Redux approaches
+  - Improved user experience with better feedback during signing operations
+
+### Changed
+- Refactored event signing logic to use a centralized service
+- Updated existing components to use the new event signing architecture
+- Improved error handling for Nostr event signing
+
+### Fixed
+- Fixed extension signing hanging by adding proper timeout handling
+- Fixed inconsistent behavior when signing events with different authentication methods
+- Improved error messages for signing failures
+
 ## [2.2.2] - 2025-03-15
 
 ### Added

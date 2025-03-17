@@ -11,12 +11,13 @@ import ErrorBoundary from '@/components/ErrorBoundary'
 import ErrorHandler from '@/components/ErrorHandler'
 import Script from 'next/script'
 import { Analytics } from '@vercel/analytics/react'
+import { PasswordModalProvider } from '@/contexts/PasswordModalContext'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Xeadline - Decentralized Reddit Alternative',
-  description: 'A decentralized Reddit alternative built on Nostr and Lightning Network',
+  title: 'Xeadline - Own the internet',
+  description: 'A decentralised forum built on Nostr and the Lightning Network',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -29,16 +30,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <ErrorHandler />
           <ErrorBoundary>
-            <BrowserCheck>
-              {/* Phase 2: Re-enabled NostrInitializer with feature flags and phased initialization */}
-              <NostrInitializer />
-              <AuthInitializer />
-              <MainLayout>
-                {children}
-              </MainLayout>
-              {/* Phase 1: Re-enabled ConnectionStatus with error handling */}
-              <ConnectionStatus />
-            </BrowserCheck>
+            <PasswordModalProvider>
+              <BrowserCheck>
+                {/* Phase 2: Re-enabled NostrInitializer with feature flags and phased initialization */}
+                <NostrInitializer />
+                <AuthInitializer />
+                <MainLayout>
+                  {children}
+                </MainLayout>
+                {/* Phase 1: Re-enabled ConnectionStatus with error handling */}
+                <ConnectionStatus />
+              </BrowserCheck>
+            </PasswordModalProvider>
           </ErrorBoundary>
         </Providers>
         <Analytics />

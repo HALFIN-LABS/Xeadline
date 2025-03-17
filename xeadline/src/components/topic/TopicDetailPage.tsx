@@ -94,32 +94,29 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
         privateKeyLength: currentUser.privateKey ? currentUser.privateKey.length : 0
       });
       
-      // Check if we have a private key in memory
-      if (currentUser.privateKey) {
-        try {
-          await dispatch(subscribeToTopic({
-            topicId,
-            privateKey: currentUser.privateKey
-          })).unwrap();
-          
-          console.log('Successfully subscribed to topic');
-        } catch (error) {
-          console.error('Error subscribing to topic:', error);
-        } finally {
+      try {
+        // Try to subscribe using the improved event signing service
+        // This will try to use window.nostr first, then fall back to other methods
+        await dispatch(subscribeToTopic({
+          topicId,
+          privateKey: currentUser.privateKey // This is optional now
+        })).unwrap();
+        
+        console.log('Successfully subscribed to topic');
+        setIsSubscribing(false);
+      } catch (error) {
+        console.error('Error subscribing to topic:', error);
+        
+        // If we have an encrypted private key, show the password modal
+        if (currentUser.encryptedPrivateKey) {
+          console.log('Subscription failed, but found encrypted key. Showing password prompt.');
+          setPendingAction('subscribe');
+          setShowPasswordModal(true);
+          // Don't reset isSubscribing here, it will be reset after password entry
+        } else {
+          console.error('Cannot subscribe: No private key available and no extension detected');
           setIsSubscribing(false);
         }
-      }
-      // Check if we have an encrypted private key in storage
-      else if (currentUser.encryptedPrivateKey) {
-        console.log('No private key in memory, but found encrypted key. Showing password prompt.');
-        setPendingAction('subscribe');
-        setShowPasswordModal(true);
-        // Don't reset isSubscribing here, it will be reset after password entry
-      }
-      // No private key available
-      else {
-        console.error('Cannot subscribe: No private key available');
-        setIsSubscribing(false);
       }
     } else {
       console.error('Cannot subscribe: No current user');
@@ -140,32 +137,29 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
         privateKeyLength: currentUser.privateKey ? currentUser.privateKey.length : 0
       });
       
-      // Check if we have a private key in memory
-      if (currentUser.privateKey) {
-        try {
-          await dispatch(unsubscribeFromTopic({
-            topicId,
-            privateKey: currentUser.privateKey
-          })).unwrap();
-          
-          console.log('Successfully unsubscribed from topic');
-        } catch (error) {
-          console.error('Error unsubscribing from topic:', error);
-        } finally {
+      try {
+        // Try to unsubscribe using the improved event signing service
+        // This will try to use window.nostr first, then fall back to other methods
+        await dispatch(unsubscribeFromTopic({
+          topicId,
+          privateKey: currentUser.privateKey // This is optional now
+        })).unwrap();
+        
+        console.log('Successfully unsubscribed from topic');
+        setIsSubscribing(false);
+      } catch (error) {
+        console.error('Error unsubscribing from topic:', error);
+        
+        // If we have an encrypted private key, show the password modal
+        if (currentUser.encryptedPrivateKey) {
+          console.log('Unsubscription failed, but found encrypted key. Showing password prompt.');
+          setPendingAction('unsubscribe');
+          setShowPasswordModal(true);
+          // Don't reset isSubscribing here, it will be reset after password entry
+        } else {
+          console.error('Cannot unsubscribe: No private key available and no extension detected');
           setIsSubscribing(false);
         }
-      }
-      // Check if we have an encrypted private key in storage
-      else if (currentUser.encryptedPrivateKey) {
-        console.log('No private key in memory, but found encrypted key. Showing password prompt.');
-        setPendingAction('unsubscribe');
-        setShowPasswordModal(true);
-        // Don't reset isSubscribing here, it will be reset after password entry
-      }
-      // No private key available
-      else {
-        console.error('Cannot unsubscribe: No private key available');
-        setIsSubscribing(false);
       }
     } else {
       console.error('Cannot unsubscribe: No current user');
