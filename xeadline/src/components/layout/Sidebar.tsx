@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 
 export default function Sidebar() {
@@ -203,9 +204,11 @@ function HelpIcon() {
 
 function XeadlineIcon() {
   return (
-    <img
+    <Image
       src="/xeadline-icon.svg"
       alt="Xeadline"
+      width={20}
+      height={20}
       className="h-5 w-5"
       style={{ filter: 'brightness(0) invert(var(--sidebar-icon-invert, 0))' }}
     />

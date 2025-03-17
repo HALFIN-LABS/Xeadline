@@ -57,9 +57,11 @@ export default function Header() {
         {/* Logo */}
         <Link href="/" className="flex items-center px-4">
           <div className="h-8 w-8 relative mr-2 flex-shrink-0 bg-bottle-green rounded-full flex items-center justify-center">
-            <img
+            <Image
               src="/xeadline-icon.svg"
               alt="Xeadline"
+              width={20}
+              height={20}
               className="h-5 w-5"
               style={{ filter: 'brightness(0) invert(1)' }}
             />
