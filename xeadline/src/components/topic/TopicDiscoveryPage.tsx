@@ -78,7 +78,7 @@ export default function TopicDiscoveryPage() {
               ? 'No trending topics found.' 
               : 'No new topics found.'}
           </p>
-          <Link href="/t/create" className="mt-4 inline-block tab tab-selected">
+          <Link href="/t/create" className="mt-4 inline-block px-4 py-2 bg-bottle-green text-white rounded-md hover:bg-bottle-green-700 transition-colors">
             Create a Topic
           </Link>
         </div>
@@ -126,10 +126,7 @@ export default function TopicDiscoveryPage() {
               New
             </button>
           </div>
-          <div className="flex items-center gap-4">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Discover topics
-            </p>
+          <div className="flex items-center">
             <Link href="/t/create" className="tab tab-selected">
               Create Topic
             </Link>

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import {
@@ -57,11 +56,9 @@ export default function Header() {
         {/* Logo */}
         <Link href="/" className="flex items-center px-4">
           <div className="h-8 w-8 relative mr-2 flex-shrink-0 bg-bottle-green rounded-full flex items-center justify-center">
-            <Image
+            <img
               src="/xeadline-icon.svg"
               alt="Xeadline"
-              width={20}
-              height={20}
               className="h-5 w-5"
               style={{ filter: 'brightness(0) invert(1)' }}
             />
@@ -114,15 +111,12 @@ export default function Header() {
               >
                 {currentUser?.publicKey ? (
                   <div className="w-8 h-8 rounded-full overflow-hidden">
-                    <Image
+                    <img
                       src={currentProfile?.picture
                         ? getSafeImageUrl(currentProfile.picture, currentUser.publicKey)
                         : generateRobohashUrl(currentUser.publicKey, 32)}
                       alt="User avatar"
-                      width={32}
-                      height={32}
                       className="w-full h-full object-cover"
-                      priority
                       onError={createImageErrorHandler(currentUser.publicKey)}
                     />
                   </div>
