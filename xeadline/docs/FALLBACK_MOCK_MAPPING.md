@@ -137,3 +137,63 @@ The key files that need to be modified are:
 - `src/app/layout.tsx`: Uncomment the NostrInitializer and ConnectionStatus components
 - `src/hooks/useNostrConnection.ts`: Ensure it properly handles errors and falls back gracefully
 - `src/hooks/useProfileSync.ts`: Ensure it properly handles errors and falls back gracefully
+
+
+
+
+
+Phase 1: Re-enable ConnectionStatus Component (Immediate)
+The ConnectionStatus component is relatively self-contained and can be reintroduced first with some modifications to make it more resilient:
+
+Create a modified ConnectionStatus component with error handling:
+
+Add try-catch blocks around any interactions with nostrService
+Use the mockNostrService as a fallback if the real service is unavailable
+Add a feature flag to easily disable specific features if they cause issues
+Update the layout.tsx file to use the ConnectionStatus component:
+
+Uncomment the ConnectionStatus component in layout.tsx
+The component will display "Disconnected" status initially, which is accurate since NostrInitializer is still disabled
+Test the changes:
+
+Verify that the ConnectionStatus component appears at the bottom right of the screen
+Confirm that clicking it shows the relay status modal
+Ensure it doesn't cause any client-side errors
+Phase 2: Re-enable NostrInitializer with Limited Functionality (Next Step)
+After the ConnectionStatus component is working properly:
+
+Create a modified NostrInitializer component:
+
+Implement a phased initialization approach where it only enables non-critical features first
+Add feature flags to control which aspects of Nostr functionality are enabled
+Use the mockNostrService for any features that aren't ready for real connectivity
+Update the layout.tsx file:
+
+Uncomment the NostrInitializer component with the new safety measures
+Test thoroughly before proceeding to the next phase
+Phase 3: Gradually Enable Full Nostr Connectivity (Final Step)
+Once the basic components are working without errors:
+
+Enable real relay connections:
+
+Start with a single relay to test connectivity
+Gradually add more relays as stability is confirmed
+Monitor for errors and fall back to mock implementations if needed
+Enable profile synchronization:
+
+Re-enable the profile sync functionality with proper error handling
+Test with different user scenarios to ensure stability
+Remove fallbacks and mocks:
+
+Once everything is stable, gradually remove the fallbacks and mock implementations
+Replace with proper error handling in the real implementations
+Implementation Details for Phase 1 (ConnectionStatus)
+To re-enable the ConnectionStatus component safely:
+
+The ConnectionStatus component already uses Redux state for displaying connection status, which is good because it doesn't directly depend on the nostrService being functional.
+
+The only direct interaction with nostrService is in line 61 where it accesses nostrService.relayUrls?.length. This can be made safer by adding a fallback value.
+
+The RelayStatusModal component also accesses nostrService to get relay URLs, which needs similar safety measures.
+
+Since the NostrInitializer is still disabled, the ConnectionStatus will show "Disconnected" status, which is accurate and won't mislead users.
