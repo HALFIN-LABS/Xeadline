@@ -1,7 +1,7 @@
 import { Event, getEventHash, nip19 } from 'nostr-tools';
 import { hexToBytes } from '@noble/hashes/utils';
 import { schnorr } from '@noble/curves/secp256k1';
-import { retrievePrivateKey, getExtensionPublicKey } from '../../utils/nostrKeys';
+import { retrievePrivateKey, getExtensionPublicKey, checkExtensionAvailability } from '../../utils/nostrKeys';
 
 // Types
 export interface UnsignedEvent {
@@ -32,6 +32,46 @@ const MAX_RETRIES = 3;
 const DEFAULT_EXTENSION_TIMEOUT = 15000;
 
 /**
+ * Ensures that the Nostr extension is properly initialized
+ *
+ * @returns A promise that resolves to true if the extension is initialized, false otherwise
+ */
+async function ensureExtensionInitialized(): Promise<boolean> {
+  if (typeof window === 'undefined' || !window.nostr) {
+    console.log('ensureExtensionInitialized: No window.nostr object available');
+    return false;
+  }
+  
+  try {
+    // Check if the extension is available
+    const isAvailable = await checkExtensionAvailability();
+    if (!isAvailable) {
+      console.log('ensureExtensionInitialized: Extension is not available');
+      return false;
+    }
+    
+    // Check if the extension has the required methods
+    if (!window.nostr.getPublicKey || !window.nostr.signEvent) {
+      console.log('ensureExtensionInitialized: Extension is missing required methods');
+      return false;
+    }
+    
+    // Try to get the public key to verify the extension is working
+    const publicKey = await window.nostr.getPublicKey();
+    if (!publicKey) {
+      console.log('ensureExtensionInitialized: Failed to get public key from extension');
+      return false;
+    }
+    
+    console.log('ensureExtensionInitialized: Extension is properly initialized with public key', publicKey);
+    return true;
+  } catch (error) {
+    console.error('ensureExtensionInitialized: Error initializing extension', error);
+    return false;
+  }
+}
+
+/**
  * Sign a Nostr event using the available signing method
  * 
  * @param unsignedEvent The event to sign
@@ -54,9 +94,11 @@ export async function signEvent(
     });
     
     // Try to sign with Nostr extension
-    if (typeof window !== 'undefined' && window.nostr) {
+    const isExtensionInitialized = await ensureExtensionInitialized();
+    
+    if (isExtensionInitialized) {
       try {
-        console.log('eventSigningService: Attempting to sign with extension');
+        console.log('eventSigningService: Extension is initialized, attempting to sign with it');
         
         // Get the public key from the extension
         const extensionPubkey = await getExtensionPublicKey();
@@ -85,7 +127,7 @@ export async function signEvent(
         
         // Sign the event with timeout
         const signedEvent = await Promise.race([
-          window.nostr.signEvent(eventToSign),
+          window.nostr!.signEvent(eventToSign),
           new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error('Extension signing timed out')), timeout)
           )
@@ -109,6 +151,8 @@ export async function signEvent(
         console.error('eventSigningService: Error signing with extension:', extensionError);
         // Fall through to try other methods
       }
+    } else {
+      console.log('eventSigningService: Extension is not available, skipping extension signing');
     }
     
     // Try to sign with provided private key
