@@ -1,7 +1,7 @@
-import { Event, getEventHash } from 'nostr-tools';
+import { Event, getEventHash, nip19 } from 'nostr-tools';
 import { hexToBytes } from '@noble/hashes/utils';
 import { schnorr } from '@noble/curves/secp256k1';
-import { retrievePrivateKey } from '../../utils/nostrKeys';
+import { retrievePrivateKey, getExtensionPublicKey } from '../../utils/nostrKeys';
 
 // Types
 export interface UnsignedEvent {
@@ -58,16 +58,46 @@ export async function signEvent(
       try {
         console.log('eventSigningService: Attempting to sign with extension');
         
-        // Set the pubkey from the extension
-        unsignedEvent.pubkey = await window.nostr.getPublicKey();
+        // Get the public key from the extension
+        const extensionPubkey = await getExtensionPublicKey();
+        
+        if (!extensionPubkey) {
+          console.error('eventSigningService: Failed to get public key from extension');
+          throw new Error('Failed to get public key from extension');
+        }
+        
+        console.log('eventSigningService: Got public key from extension', {
+          extensionPubkey,
+          originalPubkey: unsignedEvent.pubkey
+        });
+        
+        // Create a properly formatted event for the extension
+        // NIP-07 compliant extensions expect this format
+        const eventToSign = {
+          kind: unsignedEvent.kind,
+          created_at: unsignedEvent.created_at,
+          tags: unsignedEvent.tags,
+          content: unsignedEvent.content,
+          pubkey: extensionPubkey
+        };
+        
+        console.log('eventSigningService: Sending event to extension for signing', eventToSign);
         
         // Sign the event with timeout
         const signedEvent = await Promise.race([
-          window.nostr.signEvent(unsignedEvent),
-          new Promise<never>((_, reject) => 
+          window.nostr.signEvent(eventToSign),
+          new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error('Extension signing timed out')), timeout)
           )
         ]);
+        
+        console.log('eventSigningService: Received signed event from extension', signedEvent);
+        
+        // Verify that the signed event has all required fields
+        if (!signedEvent || !signedEvent.id || !signedEvent.sig) {
+          console.error('eventSigningService: Invalid signed event from extension', signedEvent);
+          throw new Error('Invalid signed event from extension');
+        }
         
         console.log('eventSigningService: Successfully signed with extension');
         
