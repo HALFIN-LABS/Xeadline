@@ -33,6 +33,8 @@ import { AppDispatch } from '../redux/store';
 
 // Session storage key
 const SESSION_KEY = 'xeadline_session';
+// Use localStorage instead of sessionStorage to persist across refreshes
+const useLocalStorage = true;
 
 /**
  * Initializes the authentication state
@@ -46,7 +48,9 @@ export async function initializeAuth(dispatch: AppDispatch) {
   dispatch(setExtensionAvailable(hasExtension));
   
   // Check for existing session
-  const session = sessionStorage.getItem(SESSION_KEY);
+  const session = useLocalStorage
+    ? localStorage.getItem(SESSION_KEY)
+    : sessionStorage.getItem(SESSION_KEY);
   if (session) {
     try {
       const sessionData = JSON.parse(session);
@@ -278,12 +282,21 @@ function createSession(
     ...data,
     password: password || undefined
   };
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+  
+  if (useLocalStorage) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+  } else {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+  }
 }
 
 /**
- * Clears the session from sessionStorage
+ * Clears the session from storage
  */
 function clearSession() {
-  sessionStorage.removeItem(SESSION_KEY);
+  if (useLocalStorage) {
+    localStorage.removeItem(SESSION_KEY);
+  } else {
+    sessionStorage.removeItem(SESSION_KEY);
+  }
 }
