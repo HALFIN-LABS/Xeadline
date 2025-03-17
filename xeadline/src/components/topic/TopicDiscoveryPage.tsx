@@ -78,7 +78,7 @@ export default function TopicDiscoveryPage() {
               ? 'No trending topics found.' 
               : 'No new topics found.'}
           </p>
-          <Link href="/t/create" className="mt-4 inline-block px-4 py-2 bg-bottle-green text-white rounded-md hover:bg-bottle-green-700 transition-colors">
+          <Link href="/t/create" className="mt-4 inline-block tab tab-selected">
             Create a Topic
           </Link>
         </div>
@@ -107,20 +107,20 @@ export default function TopicDiscoveryPage() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setActiveTab('trending')}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium ${
+              className={`tab ${
                 activeTab === 'trending'
-                  ? 'bg-bottle-green text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                  ? 'tab-selected'
+                  : 'tab-unselected'
               }`}
             >
               Trending
             </button>
             <button
               onClick={() => setActiveTab('new')}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium ${
+              className={`tab ${
                 activeTab === 'new'
-                  ? 'bg-bottle-green text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                  ? 'tab-selected'
+                  : 'tab-unselected'
               }`}
             >
               New
@@ -130,7 +130,7 @@ export default function TopicDiscoveryPage() {
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Discover topics
             </p>
-            <Link href="/t/create" className="px-4 py-1.5 rounded-full bg-bottle-green text-white text-sm font-medium hover:bg-bottle-green-700 transition-colors">
+            <Link href="/t/create" className="tab tab-selected">
               Create Topic
             </Link>
           </div>
