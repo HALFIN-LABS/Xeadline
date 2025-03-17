@@ -4,6 +4,7 @@ import { Event, getEventHash, Filter } from 'nostr-tools';
 import { hexToBytes } from '@noble/hashes/utils';
 import { schnorr } from '@noble/curves/secp256k1';
 import nostrService from '../../services/nostr/nostrService';
+import { signEvent, UnsignedEvent } from '../../services/nostr/eventSigningService';
 
 // Define types
 export interface Topic {
@@ -189,8 +190,8 @@ export const createTopic = createAsyncThunk(
       try {
         console.log(`Auto-subscribing creator to topic: ${topic.id}`);
         
-        // Create a subscription event
-        const subscriptionEvent: Event = {
+        // Create an unsigned subscription event
+        const unsignedSubscriptionEvent: UnsignedEvent = {
           kind: TOPIC_SUBSCRIPTION_KIND,
           created_at: Math.floor(Date.now() / 1000),
           tags: [
@@ -199,29 +200,19 @@ export const createTopic = createAsyncThunk(
             ['client', 'xeadline']
           ],
           content: '',
-          pubkey: signedEvent.pubkey,
-          id: '', // Will be filled in
-          sig: '' // Will be filled in
+          pubkey: signedEvent.pubkey
         };
         
-        // Sign the subscription event
-        let signedSubscriptionEvent: Event | null = null;
-        if (typeof window !== 'undefined' && window.nostr) {
-          // Use Nostr extension
-          signedSubscriptionEvent = await window.nostr.signEvent(subscriptionEvent);
-        } else if (privateKey) {
-          // Use provided private key
-          subscriptionEvent.id = getEventHash(subscriptionEvent);
-          const sig = schnorr.sign(subscriptionEvent.id, hexToBytes(privateKey));
-          subscriptionEvent.sig = Buffer.from(sig).toString('hex');
-          signedSubscriptionEvent = subscriptionEvent;
-        } else {
-          console.error('No signing method available for subscription');
-          // Continue even if subscription fails
-        }
+        // Use the improved event signing service
+        const signingResult = await signEvent(unsignedSubscriptionEvent, {
+          privateKey,
+          timeout: 15000,
+          retryCount: 0
+        });
         
         // Publish the subscription event
-        if (signedSubscriptionEvent) {
+        if (signingResult.success && signingResult.event) {
+          const signedSubscriptionEvent = signingResult.event;
           const publishedTo = await nostrService.publishEvent(signedSubscriptionEvent);
           console.log(`Published subscription event to ${publishedTo.length} relays`);
           
@@ -574,8 +565,29 @@ export const subscribeToTopic = createAsyncThunk(
         hasNostrExtension: typeof window !== 'undefined' && !!window.nostr
       });
       
-      // Create a subscription event
-      const event: Event = {
+      // Get the current user's public key
+      let pubkey = '';
+      if (typeof window !== 'undefined' && window.nostr) {
+        try {
+          pubkey = await window.nostr.getPublicKey();
+        } catch (error) {
+          console.error('Error getting public key from extension:', error);
+        }
+      } else if (privateKey) {
+        try {
+          pubkey = getPublicKey(hexToBytes(privateKey));
+        } catch (error) {
+          console.error('Error deriving public key from private key:', error);
+          return rejectWithValue(`Error deriving public key: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+      
+      if (!pubkey) {
+        return rejectWithValue('Could not determine user public key');
+      }
+      
+      // Create an unsigned subscription event
+      const unsignedEvent: UnsignedEvent = {
         kind: TOPIC_SUBSCRIPTION_KIND,
         created_at: Math.floor(Date.now() / 1000),
         tags: [
@@ -584,50 +596,22 @@ export const subscribeToTopic = createAsyncThunk(
           ['client', 'xeadline']
         ],
         content: '',
-        pubkey: '', // Will be filled in
-        id: '', // Will be filled in
-        sig: '' // Will be filled in
+        pubkey
       };
       
-      let signedEvent: Event;
+      // Use the improved event signing service
+      const signingResult = await signEvent(unsignedEvent, {
+        privateKey,
+        timeout: 15000,
+        retryCount: 0
+      });
       
-      // Sign the event
-      if (typeof window !== 'undefined' && window.nostr) {
-        // Use Nostr extension
-        event.pubkey = await window.nostr.getPublicKey();
-        signedEvent = await window.nostr.signEvent(event);
-      } else if (privateKey) {
-        // Use provided private key
-        console.log('Using provided private key for signing', {
-          privateKeyLength: privateKey.length,
-          privateKeyType: typeof privateKey,
-          privateKeyStart: privateKey.substring(0, 4) + '...',
-          isHex: /^[0-9a-f]{64}$/i.test(privateKey)
-        });
-        
-        try {
-          const pubkey = getPublicKey(hexToBytes(privateKey));
-          event.pubkey = pubkey;
-          
-          // Sign the event
-          event.id = getEventHash(event);
-          console.log('Event hash generated:', event.id);
-          
-          const privateKeyBytes = hexToBytes(privateKey);
-          console.log('Private key converted to bytes, length:', privateKeyBytes.length);
-          
-          const sig = schnorr.sign(event.id, privateKeyBytes);
-          event.sig = Buffer.from(sig).toString('hex');
-          console.log('Event signed successfully, signature length:', event.sig.length);
-          
-          signedEvent = event;
-        } catch (error) {
-          console.error('Error during signing process:', error);
-          return rejectWithValue(`Signing error: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      } else {
-        return rejectWithValue('No signing method available');
+      if (!signingResult.success || !signingResult.event) {
+        console.error('Failed to sign subscription event:', signingResult.error);
+        return rejectWithValue(signingResult.error || 'Failed to sign subscription event');
       }
+      
+      const signedEvent = signingResult.event;
       
       // Publish the event to relays
       const publishedTo = await nostrService.publishEvent(signedEvent);
@@ -693,8 +677,29 @@ export const unsubscribeFromTopic = createAsyncThunk(
     try {
       console.log(`Unsubscribing from topic: ${topicId}`);
       
-      // Create an unsubscription event
-      const event: Event = {
+      // Get the current user's public key
+      let pubkey = '';
+      if (typeof window !== 'undefined' && window.nostr) {
+        try {
+          pubkey = await window.nostr.getPublicKey();
+        } catch (error) {
+          console.error('Error getting public key from extension:', error);
+        }
+      } else if (privateKey) {
+        try {
+          pubkey = getPublicKey(hexToBytes(privateKey));
+        } catch (error) {
+          console.error('Error deriving public key from private key:', error);
+          return rejectWithValue(`Error deriving public key: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+      
+      if (!pubkey) {
+        return rejectWithValue('Could not determine user public key');
+      }
+      
+      // Create an unsigned unsubscription event
+      const unsignedEvent: UnsignedEvent = {
         kind: TOPIC_SUBSCRIPTION_KIND,
         created_at: Math.floor(Date.now() / 1000),
         tags: [
@@ -703,50 +708,22 @@ export const unsubscribeFromTopic = createAsyncThunk(
           ['client', 'xeadline']
         ],
         content: '',
-        pubkey: '', // Will be filled in
-        id: '', // Will be filled in
-        sig: '' // Will be filled in
+        pubkey
       };
       
-      let signedEvent: Event;
+      // Use the improved event signing service
+      const signingResult = await signEvent(unsignedEvent, {
+        privateKey,
+        timeout: 15000,
+        retryCount: 0
+      });
       
-      // Sign the event
-      if (typeof window !== 'undefined' && window.nostr) {
-        // Use Nostr extension
-        event.pubkey = await window.nostr.getPublicKey();
-        signedEvent = await window.nostr.signEvent(event);
-      } else if (privateKey) {
-        // Use provided private key
-        console.log('Using provided private key for unsubscribe signing', {
-          privateKeyLength: privateKey.length,
-          privateKeyType: typeof privateKey,
-          privateKeyStart: privateKey.substring(0, 4) + '...',
-          isHex: /^[0-9a-f]{64}$/i.test(privateKey)
-        });
-        
-        try {
-          const pubkey = getPublicKey(hexToBytes(privateKey));
-          event.pubkey = pubkey;
-          
-          // Sign the event
-          event.id = getEventHash(event);
-          console.log('Unsubscribe event hash generated:', event.id);
-          
-          const privateKeyBytes = hexToBytes(privateKey);
-          console.log('Private key converted to bytes, length:', privateKeyBytes.length);
-          
-          const sig = schnorr.sign(event.id, privateKeyBytes);
-          event.sig = Buffer.from(sig).toString('hex');
-          console.log('Unsubscribe event signed successfully, signature length:', event.sig.length);
-          
-          signedEvent = event;
-        } catch (error) {
-          console.error('Error during unsubscribe signing process:', error);
-          return rejectWithValue(`Unsubscribe signing error: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      } else {
-        return rejectWithValue('No signing method available');
+      if (!signingResult.success || !signingResult.event) {
+        console.error('Failed to sign unsubscription event:', signingResult.error);
+        return rejectWithValue(signingResult.error || 'Failed to sign unsubscription event');
       }
+      
+      const signedEvent = signingResult.event;
       
       // Publish the event to relays
       const publishedTo = await nostrService.publishEvent(signedEvent);
@@ -1019,10 +996,10 @@ export const updateTopicModerators = createAsyncThunk(
         return rejectWithValue('Topic not found');
       }
       
-      // Parse the topic ID to get pubkey and d-identifier
-      const [pubkey, dIdentifier] = topicId.split(':');
+      // Parse the topic ID to get creator pubkey and d-identifier
+      const [creatorPubkey, dIdentifier] = topicId.split(':');
       
-      if (!pubkey || !dIdentifier) {
+      if (!creatorPubkey || !dIdentifier) {
         return rejectWithValue('Invalid topic ID format');
       }
       
@@ -1036,8 +1013,34 @@ export const updateTopicModerators = createAsyncThunk(
         moderators: moderators
       };
       
-      // Create the topic update event
-      const event: Event = {
+      // Get the current user's public key
+      let userPubkey = '';
+      if (typeof window !== 'undefined' && window.nostr) {
+        try {
+          userPubkey = await window.nostr.getPublicKey();
+        } catch (error) {
+          console.error('Error getting public key from extension:', error);
+        }
+      } else if (privateKey) {
+        try {
+          userPubkey = getPublicKey(hexToBytes(privateKey));
+        } catch (error) {
+          console.error('Error deriving public key from private key:', error);
+          return rejectWithValue(`Error deriving public key: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+      
+      if (!userPubkey) {
+        return rejectWithValue('Could not determine user public key');
+      }
+      
+      // Verify that the current user is a moderator
+      if (!topic.moderators.includes(userPubkey)) {
+        return rejectWithValue('Only topic moderators can update moderators');
+      }
+      
+      // Create an unsigned topic update event
+      const unsignedEvent: UnsignedEvent = {
         kind: 34550, // NIP-72 topic definition
         created_at: Math.floor(Date.now() / 1000),
         tags: [
@@ -1047,43 +1050,22 @@ export const updateTopicModerators = createAsyncThunk(
           ['xd', 'topic']
         ],
         content: JSON.stringify(topicContent),
-        pubkey: '', // Will be filled in
-        id: '', // Will be filled in
-        sig: '' // Will be filled in
+        pubkey: userPubkey
       };
       
-      let signedEvent: Event;
+      // Use the improved event signing service
+      const signingResult = await signEvent(unsignedEvent, {
+        privateKey,
+        timeout: 15000,
+        retryCount: 0
+      });
       
-      // Sign the event
-      if (typeof window !== 'undefined' && window.nostr) {
-        // Use Nostr extension
-        event.pubkey = await window.nostr.getPublicKey();
-        
-        // Verify that the current user is a moderator
-        if (!topic.moderators.includes(event.pubkey)) {
-          return rejectWithValue('Only topic moderators can update moderators');
-        }
-        
-        signedEvent = await window.nostr.signEvent(event);
-      } else if (privateKey) {
-        // Use provided private key
-        const derivedPubkey = getPublicKey(hexToBytes(privateKey));
-        
-        // Verify that the current user is a moderator
-        if (!topic.moderators.includes(derivedPubkey)) {
-          return rejectWithValue('Only topic moderators can update moderators');
-        }
-        
-        event.pubkey = derivedPubkey;
-        
-        // Sign the event
-        event.id = getEventHash(event);
-        const sig = schnorr.sign(event.id, hexToBytes(privateKey));
-        event.sig = Buffer.from(sig).toString('hex');
-        signedEvent = event;
-      } else {
-        return rejectWithValue('No signing method available');
+      if (!signingResult.success || !signingResult.event) {
+        console.error('Failed to sign topic update event:', signingResult.error);
+        return rejectWithValue(signingResult.error || 'Failed to sign topic update event');
       }
+      
+      const signedEvent = signingResult.event;
       
       // Publish the event to Nostr relays
       console.log('Publishing topic update event to Nostr relays:', {
