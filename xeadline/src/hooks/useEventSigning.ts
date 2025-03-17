@@ -40,28 +40,61 @@ export function useEventSigning() {
       }
       
       setIsSigningInProgress(true);
+      
+      // Ensure the event has a valid pubkey
+      if (!unsignedEvent.pubkey && currentUser?.publicKey) {
+        console.log('useEventSigning: Setting missing pubkey on event');
+        unsignedEvent.pubkey = currentUser.publicKey;
+      }
+      
       console.log('useEventSigning: Attempting to sign event', {
         eventKind: unsignedEvent.kind,
         hasPrivateKey: !!currentUser?.privateKey,
         hasEncryptedKey: !!currentUser?.encryptedPrivateKey,
-        isExtensionAvailable: typeof window !== 'undefined' && !!window.nostr
+        isExtensionAvailable: typeof window !== 'undefined' && !!window.nostr,
+        pubkey: unsignedEvent.pubkey?.substring(0, 8) + '...'
       });
+      
+      // First try with extension - this is the most reliable method and matches login behavior
+      if (typeof window !== 'undefined' && window.nostr) {
+        try {
+          console.log('useEventSigning: Trying to sign with extension first');
+          
+          // Try to sign with the extension directly
+          const extensionResult = await signEvent(unsignedEvent, {
+            timeout: options.timeout || 10000
+          });
+          
+          if (extensionResult.success) {
+            console.log('useEventSigning: Successfully signed with extension');
+            return extensionResult;
+          }
+        } catch (extensionError) {
+          console.warn('useEventSigning: Extension signing failed, will try other methods', extensionError);
+          // Continue to other methods
+        }
+      }
       
       // Try to sign with the current user's private key
-      const initialResult = await signEvent(unsignedEvent, {
-        privateKey: currentUser?.privateKey,
-        timeout: options.timeout
-      });
-      
-      // If successful, return the result
-      if (initialResult.success) {
-        return initialResult;
+      if (currentUser?.privateKey) {
+        console.log('useEventSigning: Trying to sign with in-memory private key');
+        
+        const privateKeyResult = await signEvent(unsignedEvent, {
+          privateKey: currentUser.privateKey,
+          timeout: options.timeout
+        });
+        
+        // If successful, return the result
+        if (privateKeyResult.success) {
+          console.log('useEventSigning: Successfully signed with in-memory private key');
+          return privateKeyResult;
+        }
       }
       
       // If a password is needed, show the password modal
-      if (initialResult.needsPassword && currentUser?.encryptedPrivateKey) {
+      if (currentUser?.encryptedPrivateKey) {
         try {
-          console.log('useEventSigning: Password required, showing modal');
+          console.log('useEventSigning: Trying to sign with encrypted private key');
           
           // Show the password modal and get the password
           const password = await passwordModal.showPasswordModal(purpose);
@@ -73,6 +106,12 @@ export function useEventSigning() {
             password,
             timeout: options.timeout
           });
+          
+          if (passwordResult.success) {
+            console.log('useEventSigning: Successfully signed with decrypted private key');
+          } else {
+            console.error('useEventSigning: Failed to sign with decrypted private key', passwordResult.error);
+          }
           
           return passwordResult;
         } catch (passwordError) {
@@ -90,7 +129,7 @@ export function useEventSigning() {
       console.error('useEventSigning: No signing method available');
       return {
         success: false,
-        error: initialResult.error || 'No signing method available'
+        error: 'No signing method available. Please ensure you are logged in with a private key or extension.'
       };
     } catch (error) {
       console.error('Error in signEventWithPassword:', error);
@@ -128,16 +167,61 @@ export function useEventSigning() {
     }
     
     try {
-      // Publish the event
-      const publishedTo = await nostrService.publishEvent(signingResult.event);
+      console.log('useEventSigning: Successfully signed event, now publishing', {
+        eventId: signingResult.event.id,
+        eventKind: signingResult.event.kind,
+        pubkey: signingResult.event.pubkey.substring(0, 8) + '...'
+      });
+      
+      // Publish the event with retries
+      let publishedTo: string[] = [];
+      let retryCount = 0;
+      const maxRetries = options.retries || 2;
+      
+      while (retryCount <= maxRetries) {
+        try {
+          publishedTo = await nostrService.publishEvent(signingResult.event);
+          
+          if (publishedTo.length > 0) {
+            console.log(`useEventSigning: Successfully published to ${publishedTo.length} relays`, {
+              relays: publishedTo
+            });
+            break;
+          } else {
+            console.warn(`useEventSigning: Failed to publish to any relays (attempt ${retryCount + 1}/${maxRetries + 1})`);
+            retryCount++;
+            
+            if (retryCount <= maxRetries) {
+              // Wait before retrying (exponential backoff)
+              await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount - 1)));
+            }
+          }
+        } catch (publishError) {
+          console.error(`useEventSigning: Error publishing event (attempt ${retryCount + 1}/${maxRetries + 1})`, publishError);
+          retryCount++;
+          
+          if (retryCount <= maxRetries) {
+            // Wait before retrying (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount - 1)));
+          }
+        }
+      }
       
       // Return the result with the published relays
-      return {
-        ...signingResult,
-        publishedTo
-      };
+      if (publishedTo.length > 0) {
+        return {
+          ...signingResult,
+          publishedTo
+        };
+      } else {
+        return {
+          ...signingResult,
+          error: `Failed to publish event after ${maxRetries + 1} attempts`,
+          publishedTo: []
+        };
+      }
     } catch (error) {
-      console.error('Error publishing event:', error);
+      console.error('Error in publish process:', error);
       return {
         ...signingResult,
         error: 'Event signed successfully but failed to publish: ' +

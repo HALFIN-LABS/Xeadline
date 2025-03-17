@@ -57,14 +57,43 @@ async function ensureExtensionInitialized(): Promise<boolean> {
     }
     
     // Try to get the public key to verify the extension is working
-    const publicKey = await window.nostr.getPublicKey();
+    // Add a timeout to prevent hanging if the extension is unresponsive
+    const publicKey = await Promise.race([
+      window.nostr.getPublicKey(),
+      new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error('Extension getPublicKey timed out')), 5000)
+      )
+    ]);
+    
     if (!publicKey) {
       console.log('ensureExtensionInitialized: Failed to get public key from extension');
       return false;
     }
     
-    console.log('ensureExtensionInitialized: Extension is properly initialized with public key', publicKey);
-    return true;
+    // Verify the extension can actually sign by attempting a small test event
+    try {
+      const testEvent = {
+        kind: 1,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [],
+        content: '',
+        pubkey: publicKey
+      };
+      
+      // Just check if the extension responds to signEvent, don't actually publish
+      await Promise.race([
+        window.nostr.signEvent(testEvent),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Extension test signing timed out')), 5000)
+        )
+      ]);
+      
+      console.log('ensureExtensionInitialized: Extension is properly initialized and can sign events');
+      return true;
+    } catch (testError) {
+      console.error('ensureExtensionInitialized: Extension failed test signing', testError);
+      return false;
+    }
   } catch (error) {
     console.error('ensureExtensionInitialized: Error initializing extension', error);
     return false;
@@ -93,28 +122,28 @@ export async function signEvent(
       isExtensionAvailable: typeof window !== 'undefined' && !!window.nostr
     });
     
-    // Try to sign with Nostr extension
-    const isExtensionInitialized = await ensureExtensionInitialized();
-    
-    if (isExtensionInitialized) {
+    // Try to sign with Nostr extension - using a simpler approach similar to login
+    if (typeof window !== 'undefined' && window.nostr) {
       try {
-        console.log('eventSigningService: Extension is initialized, attempting to sign with it');
+        console.log('eventSigningService: Nostr extension detected, attempting to sign with it');
         
-        // Get the public key from the extension
-        const extensionPubkey = await getExtensionPublicKey();
+        // Get the public key directly from the extension - simpler approach like in login
+        const extensionPubkey = await Promise.race([
+          window.nostr.getPublicKey(),
+          new Promise<null>((_, reject) =>
+            setTimeout(() => reject(new Error('Getting public key from extension timed out')), 5000)
+          )
+        ]);
         
         if (!extensionPubkey) {
           console.error('eventSigningService: Failed to get public key from extension');
           throw new Error('Failed to get public key from extension');
         }
         
-        console.log('eventSigningService: Got public key from extension', {
-          extensionPubkey,
-          originalPubkey: unsignedEvent.pubkey
-        });
+        console.log('eventSigningService: Got public key from extension', extensionPubkey);
         
         // Create a properly formatted event for the extension
-        // NIP-07 compliant extensions expect this format
+        // Always use the extension's pubkey as required by NIP-07
         const eventToSign = {
           kind: unsignedEvent.kind,
           created_at: unsignedEvent.created_at,
@@ -123,17 +152,15 @@ export async function signEvent(
           pubkey: extensionPubkey
         };
         
-        console.log('eventSigningService: Sending event to extension for signing', eventToSign);
+        console.log('eventSigningService: Sending event to extension for signing');
         
         // Sign the event with timeout
         const signedEvent = await Promise.race([
-          window.nostr!.signEvent(eventToSign),
+          window.nostr.signEvent(eventToSign),
           new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error('Extension signing timed out')), timeout)
           )
         ]);
-        
-        console.log('eventSigningService: Received signed event from extension', signedEvent);
         
         // Verify that the signed event has all required fields
         if (!signedEvent || !signedEvent.id || !signedEvent.sig) {
