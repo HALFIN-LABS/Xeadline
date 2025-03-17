@@ -170,13 +170,13 @@ export default function Header() {
             <>
               <button
                 onClick={() => openAuthModal(AuthMode.SIGNUP)}
-                className="btn btn-primary hidden sm:block"
+                className="tab tab-selected hidden sm:block"
               >
                 Sign Up
               </button>
               <button
                 onClick={() => openAuthModal(AuthMode.LOGIN)}
-                className="btn btn-secondary hidden sm:block"
+                className="tab tab-unselected hidden sm:block"
               >
                 Log In
               </button>
@@ -210,7 +210,7 @@ export default function Header() {
               <div className="pt-2 border-t border-gray-200 dark:border-gray-800 flex space-x-2">
                 {isAuthenticated ? (
                   <button
-                    className="btn btn-secondary flex-1"
+                    className="tab tab-unselected flex-1"
                     onClick={handleLogout}
                   >
                     Sign Out
@@ -219,13 +219,13 @@ export default function Header() {
                   <>
                     <button
                       onClick={() => openAuthModal(AuthMode.SIGNUP)}
-                      className="btn btn-primary flex-1"
+                      className="tab tab-selected flex-1"
                     >
                       Sign Up
                     </button>
                     <button
                       onClick={() => openAuthModal(AuthMode.LOGIN)}
-                      className="btn btn-secondary flex-1"
+                      className="tab tab-unselected flex-1"
                     >
                       Log In
                     </button>
