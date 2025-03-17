@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Inter, Roboto } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/redux/provider'
 import NostrInitializer from '@/components/NostrInitializer'
@@ -14,6 +14,11 @@ import { Analytics } from '@vercel/analytics/react'
 import { PasswordModalProvider } from '@/contexts/PasswordModalContext'
 
 const inter = Inter({ subsets: ['latin'] })
+const roboto = Roboto({
+  weight: ['400', '700'],
+  subsets: ['latin'],
+  variable: '--font-roboto'
+})
 
 export const metadata: Metadata = {
   title: 'Xeadline - Own the internet',
@@ -22,7 +27,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className={`dark ${roboto.variable}`}>
       <head>
         {/* Dark mode is now applied directly to the HTML element */}
       </head>

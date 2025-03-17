@@ -56,12 +56,15 @@ export default function Header() {
       <div className="h-14 flex items-center">
         {/* Logo */}
         <Link href="/" className="flex items-center px-4">
-          <div className="h-8 w-8 relative mr-2 flex-shrink-0">
-            <div className="h-8 w-8 bg-bottle-green rounded-full flex items-center justify-center text-white font-bold">
-              X
-            </div>
+          <div className="h-8 w-8 relative mr-2 flex-shrink-0 bg-bottle-green rounded-full flex items-center justify-center">
+            <img
+              src="/xeadline-icon.svg"
+              alt="Xeadline"
+              className="h-5 w-5"
+              style={{ filter: 'brightness(0) invert(1)' }}
+            />
           </div>
-          <span className="text-xl font-bold text-bottle-green hidden sm:block">Xeadline</span>
+          <span className="text-xl font-bold text-white hidden sm:block" style={{ fontFamily: 'var(--font-roboto)' }}>Xeadline</span>
         </Link>
 
         {/* Mobile menu button */}

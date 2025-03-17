@@ -8,12 +8,14 @@
   --bottle-green: 0, 106, 78;
   --text-light: 75, 85, 99; /* gray-600 for better contrast in light mode */
   --text-dark: 229, 231, 235; /* gray-200 for better contrast in dark mode */
+  --sidebar-icon-invert: 0; /* No inversion in light mode */
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --foreground-rgb: 255, 255, 255;
     --background-rgb: 10, 10, 10;
+    --sidebar-icon-invert: 1; /* Invert icons in dark mode */
   }
 }
 
@@ -44,6 +46,11 @@ html.dark .text-gray-800,
 html.dark .text-gray-900,
 html.dark .text-black {
   color: rgb(209, 213, 219) !important; /* gray-300 for better contrast in dark mode */
+}
+
+/* Dark mode class-based variables */
+html.dark {
+  --sidebar-icon-invert: 1; /* Invert icons in dark mode */
 }
 
 /* Fix for white text in light mode */
