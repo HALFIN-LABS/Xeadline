@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import { signAndPublishEvent, selectEventLoading, clearError } from '../../redux/slices/eventSlice';

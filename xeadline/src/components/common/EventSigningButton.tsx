@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from 'react';
 import { SignAndPublishOptions, useEventSigning } from '../../hooks/useEventSigning';
 import { UnsignedEvent } from '../../services/nostr/eventSigningService';

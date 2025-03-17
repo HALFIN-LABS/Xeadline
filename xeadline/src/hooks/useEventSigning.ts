@@ -1,3 +1,5 @@
+"use client";
+
 import { useCallback, useState } from 'react';
 import { usePasswordModal } from '../contexts/PasswordModalContext';
 import { signEvent, UnsignedEvent, SigningResult } from '../services/nostr/eventSigningService';

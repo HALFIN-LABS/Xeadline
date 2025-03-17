@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import { selectEventError, selectNeedsPassword, clearError } from '../../redux/slices/eventSlice';
