@@ -12,11 +12,35 @@ import {
   unsubscribeFromTopic,
   selectIsSubscribed
 } from '../../redux/slices/topicSlice';
+import { fetchPostsForTopic, selectPostsByTopic, selectPostsLoading } from '../../redux/slices/postSlice';
 import { selectCurrentUser } from '../../redux/slices/authSlice';
 import Image from 'next/image';
 import Link from 'next/link';
 import TopicManagersButton from './TopicManagersButton';
-import { TopicPostCreationForm } from './TopicPostCreationForm';
+import { Button } from '../ui/Button';
+import { PostCreationModal } from '../post/PostCreationModal';
+import { PostCard } from '../post/PostCard';
+import Modal from '../ui/Modal';
+import { useUserProfileWithCache } from '../../hooks/useUserProfileWithCache';
+
+// Moderator item component with NIP-05 verification
+const ModeratorItem = ({ pubkey }: { pubkey: string }) => {
+  const { username } = useUserProfileWithCache(pubkey);
+  
+  return (
+    <div className="flex items-center p-2 bg-gray-800/30 rounded-lg">
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+      </svg>
+      <Link
+        href={`/profile/${pubkey}`}
+        className="text-blue-400 hover:underline"
+      >
+        {username}
+      </Link>
+    </div>
+  );
+};
 
 interface TopicDetailPageProps {
   topicId: string;
@@ -29,15 +53,26 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
   const error = useAppSelector(selectTopicError);
   const currentUser = useAppSelector(selectCurrentUser);
   const isSubscribed = useAppSelector(state => selectIsSubscribed(state, topicId));
+  const posts = useAppSelector(state => selectPostsByTopic(state, topicId));
+  const isPostsLoading = useAppSelector(selectPostsLoading);
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<'subscribe' | 'unsubscribe' | null>(null);
+  const [showPostModal, setShowPostModal] = useState(false);
+  const [showModerationModal, setShowModerationModal] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
   
   useEffect(() => {
     dispatch(fetchTopic(topicId));
   }, [dispatch, topicId]);
+  
+  useEffect(() => {
+    if (topic) {
+      dispatch(fetchPostsForTopic(topicId));
+    }
+  }, [dispatch, topicId, topic]);
   
   const handlePasswordSubmit = useCallback(async () => {
     if (!currentUser || !password) return;
@@ -265,7 +300,7 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
           </div>
         </div>
       )}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+      <div className="max-w-2xl mx-auto bg-white dark:bg-[rgb(10,10,10)] rounded-lg shadow overflow-hidden">
         {/* Banner */}
         <div className="relative h-48 bg-gray-200 dark:bg-gray-700">
           <Image
@@ -292,9 +327,19 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
             />
           </div>
           
-          {/* Subscribe Button */}
+          {/* Action Buttons */}
           {currentUser && (
-            <div className="absolute top-4 right-4">
+            <div className="absolute top-4 right-4 flex space-x-2">
+              {/* Post Button */}
+              <Button
+                variant="primary"
+                onClick={() => setShowPostModal(true)}
+                className="px-4 py-2 bg-bottle-green text-white hover:bg-bottle-green-700"
+              >
+                Post
+              </Button>
+              
+              {/* Subscribe Button */}
               <button
                 onClick={isSubscribed ? handleUnsubscribe : handleSubscribe}
                 className={`px-4 py-2 rounded-md font-medium ${
@@ -347,80 +392,163 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
               </div>
             </div>
             
-            <div className="mt-4 text-gray-700 dark:text-gray-300">
+            <div className="mt-4 mb-4 text-gray-700 dark:text-gray-300">
               {topic.description}
             </div>
             
-            {/* Topic Rules */}
-            {topic.rules && topic.rules.length > 0 && (
-              <div className="mt-6">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Topic Rules</h2>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-4">
-                  <ul className="list-disc pl-5 space-y-1">
-                    {topic.rules.map((rule, index) => (
-                      <li key={index} className="text-gray-700 dark:text-gray-300">
-                        {rule}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
-            
-            {/* Moderators */}
-            {topic.moderators && topic.moderators.length > 0 && (
-              <div className="mt-6">
-                <div className="flex justify-between items-center mb-2">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Moderators</h2>
-                  {/* Only show the manage button if the user is a moderator */}
-                  {currentUser && topic.moderators.includes(currentUser.publicKey) && (
-                    <TopicManagersButton />
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {topic.moderators.map((moderator, index) => (
-                    <Link 
-                      key={index}
-                      href={`/profile/${moderator}`}
-                      className="inline-flex items-center bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                      </svg>
-                      {moderator.substring(0, 8)}...
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Moderation and Rules buttons */}
+            <div className="flex space-x-4 mt-2">
+              <button
+                onClick={() => setShowModerationModal(true)}
+                className="flex items-center text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                Management
+              </button>
+              
+              <button
+                onClick={() => setShowRulesModal(true)}
+                className="flex items-center text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+                </svg>
+                Rules
+              </button>
+            </div>
           </div>
         </div>
       </div>
       
-      {/* Post creation form */}
-      <div className="mt-6">
-        <TopicPostCreationForm
-          topicId={topicId}
-          topicName={topic.name}
-          topicRules={topic.rules?.map(rule => ({ title: rule })) || [
-            { title: "Be respectful to others", description: "Treat others as you would like to be treated" },
-            { title: "No spam or self-promotion", description: "Don't post content solely to promote yourself or your business" },
-            { title: "Stay on topic", description: "Posts should be relevant to this community" }
-          ]}
-        />
-      </div>
+      {/* Post Creation Modal */}
+      <PostCreationModal
+        isOpen={showPostModal}
+        onClose={() => setShowPostModal(false)}
+        topicId={topicId}
+        topicName={topic.name}
+        topicRules={topic.rules?.map(rule => ({ title: rule })) || [
+          { title: "Be respectful to others", description: "Treat others as you would like to be treated" },
+          { title: "No spam or self-promotion", description: "Don't post content solely to promote yourself or your business" },
+          { title: "Stay on topic", description: "Posts should be relevant to this community" }
+        ]}
+      />
       
-      {/* Posts list */}
-      <div className="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      {/* Moderation Modal */}
+      <Modal
+        isOpen={showModerationModal}
+        onClose={() => setShowModerationModal(false)}
+        title="Topic Moderators"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-300">
+            Moderators help maintain the quality of discussions and enforce community guidelines.
+          </p>
+          
+          {topic.moderators && topic.moderators.length > 0 ? (
+            <div className="space-y-3">
+              {topic.moderators.map((moderator, index) => (
+                <ModeratorItem key={index} pubkey={moderator} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-400 italic">No moderators assigned to this topic.</p>
+          )}
+          
+          {/* Only show the manage button if the user is a moderator */}
+          {currentUser && topic.moderators.includes(currentUser.publicKey) && (
+            <div className="mt-6 pt-4 border-t border-gray-700">
+              <h3 className="text-lg font-medium text-white mb-2">Moderator Controls</h3>
+              <p className="text-gray-300 mb-4">
+                As a moderator, you have access to additional controls for this topic.
+              </p>
+              <TopicManagersButton />
+            </div>
+          )}
+        </div>
+      </Modal>
+      
+      {/* Rules Modal */}
+      <Modal
+        isOpen={showRulesModal}
+        onClose={() => setShowRulesModal(false)}
+        title="Topic Rules"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-300">
+            These rules help maintain a positive and productive community. All members are expected to follow these guidelines.
+          </p>
+          
+          {topic.rules && topic.rules.length > 0 ? (
+            <div className="space-y-3 mt-4">
+              {topic.rules.map((rule, index) => (
+                <div key={index} className="p-3 bg-gray-800/30 rounded-lg">
+                  <div className="flex items-start">
+                    <div className="bg-bottle-green text-white rounded-full w-6 h-6 flex items-center justify-center mr-3 mt-0.5 flex-shrink-0">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <p className="text-white">{rule}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-4 bg-gray-800/30 rounded-lg text-gray-400 italic">
+              No specific rules have been set for this topic. Please follow general community guidelines and be respectful to others.
+            </div>
+          )}
+        </div>
+      </Modal>
+      
+      {/* Posts section */}
+      <div className="mt-6 max-w-2xl mx-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Posts</h2>
         </div>
         
-        <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-6 text-center">
-          <p className="text-gray-700 dark:text-gray-300">
-            No posts yet. Be the first to post in this topic!
-          </p>
+        {/* Sticky filters at the top - similar to home page */}
+        <div className="sticky top-14 z-10 bg-gray-50 dark:bg-[rgb(10,10,10)] py-4 border-b border-gray-800 mb-4">
+          <div className="flex flex-wrap gap-2">
+            <button className="tab tab-selected">
+              New
+            </button>
+            <button className="tab tab-unselected">
+              Hot
+            </button>
+            <button className="tab tab-unselected">
+              Top
+            </button>
+            <button className="tab tab-unselected">
+              Rising
+            </button>
+          </div>
         </div>
+        
+        {isPostsLoading ? (
+          <div className="flex justify-center items-center h-32">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-bottle-green"></div>
+          </div>
+        ) : posts.length > 0 ? (
+          <div className="space-y-6 pt-2">
+            {posts.map((post, index, array) => (
+              <div key={post.id}>
+                <PostCard post={post} topicName={topic.name} />
+                {index < array.length - 1 && (
+                  <div className="h-[1px] bg-gray-300 dark:bg-gray-600 border-t border-gray-400 dark:border-gray-500 mt-6 mb-6 max-w-[45rem] mx-auto" />
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-gray-50 dark:bg-[rgb(10,10,10)] rounded-md p-6 text-center">
+            <p className="text-gray-700 dark:text-gray-300">
+              No posts yet. Be the first to post in this topic!
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -9,12 +9,16 @@ interface MediaUploaderProps {
   topicId: string
   postId?: string
   onUpload?: (url: string, type: 'image' | 'video' | 'gif') => void
+  darkMode?: boolean
+  hideButtons?: boolean
 }
 
 export const MediaUploader: React.FC<MediaUploaderProps> = ({
   topicId,
   postId,
-  onUpload
+  onUpload,
+  darkMode = false,
+  hideButtons = false
 }) => {
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -65,62 +69,69 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
 
   return (
     <div className="media-uploader">
-      <div className="flex items-center">
-        {/* Image upload */}
-        <label className="cursor-pointer mr-2">
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={(e) => handleMediaUpload(e, 'image')}
-            className="hidden"
-          />
-          <Button
-            variant="secondary"
-            size="sm"
-            isLoading={isUploading}
-            disabled={isUploading}
-            title="Upload image (max 10MB)"
-          >
-            <Icon name="image" className="mr-1" />
-            Image
-          </Button>
-        </label>
-        
-        {/* Video upload - will be implemented in Phase 3 */}
-        <label className="cursor-pointer mr-2">
-          <input
-            type="file"
-            accept="video/mp4,video/quicktime"
-            onChange={(e) => handleMediaUpload(e, 'video')}
-            className="hidden"
-            disabled
-          />
+      {!hideButtons && (
+        <div className="flex items-center">
+          {/* Image upload */}
+          <label className="cursor-pointer mr-2">
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(e) => handleMediaUpload(e, 'image')}
+              className="hidden"
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              isLoading={isUploading}
+              disabled={isUploading}
+              title="Upload image (max 10MB)"
+              className={darkMode ? 'bg-black/30 border-gray-700/30 text-gray-300 hover:bg-black/50 backdrop-blur-sm rounded-md px-4 py-2' : ''}
+            >
+              Image <Icon name="image" className="ml-2" />
+            </Button>
+          </label>
+          
+          {/* Video upload - will be implemented in Phase 3 */}
+          <label className="cursor-pointer mr-2">
+            <input
+              type="file"
+              accept="video/mp4,video/quicktime"
+              onChange={(e) => handleMediaUpload(e, 'video')}
+              className="hidden"
+              disabled
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={true}
+              title="Coming soon"
+              className={darkMode ? 'bg-black/30 border-gray-700/30 text-gray-300 hover:bg-black/50 backdrop-blur-sm rounded-md px-4 py-2' : ''}
+            >
+              Video <Icon name="video" className="ml-2" />
+            </Button>
+          </label>
+          
+          {/* Link embedding - will be implemented in Phase 3 */}
           <Button
             variant="secondary"
             size="sm"
             disabled={true}
             title="Coming soon"
+            className={darkMode ? 'bg-black/30 border-gray-700/30 text-gray-300 hover:bg-black/50 backdrop-blur-sm rounded-md px-4 py-2' : ''}
           >
-            <Icon name="video" className="mr-1" />
-            Video
+            Link <Icon name="link" className="ml-2" />
           </Button>
-        </label>
-        
-        {/* Link embedding - will be implemented in Phase 3 */}
-        <Button variant="secondary" size="sm" disabled={true} title="Coming soon">
-          <Icon name="link" className="mr-1" />
-          Link
-        </Button>
-      </div>
+        </div>
+      )}
       
       {error && (
-        <div className="text-red-500 text-sm mt-2">
+        <div className={`text-red-500 text-sm mt-2 ${darkMode ? 'bg-black/20 p-2 rounded-lg border border-red-500/30' : ''}`}>
           {error}
         </div>
       )}
       
       {/* File size information */}
-      <div className="text-xs text-gray-500 mt-1">
+      <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-1`}>
         Max file sizes: Images 10MB (Videos 150MB coming soon)
       </div>
     </div>

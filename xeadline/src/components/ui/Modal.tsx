@@ -55,22 +55,22 @@ export default function Modal({ isOpen, onClose, children, title, footer }: Moda
   
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" />
-      
-      {/* Modal */}
-      <div
-        ref={modalRef}
-        className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-md mx-4 z-10 overflow-hidden max-h-[90vh] flex flex-col"
+    {/* Backdrop - glassmorphic effect */}
+    <div className="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm transition-opacity" />
+    
+    {/* Modal - true glassmorphic effect */}
+    <div
+      ref={modalRef}
+      className="bg-black/40 backdrop-blur-md border border-gray-700/30 rounded-xl shadow-2xl w-full max-w-2xl mx-4 z-10 overflow-hidden max-h-[90vh] flex flex-col"
       >
-        {/* Modal header */}
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+        {/* Modal header - glassmorphic */}
+        <div className="px-6 py-4 border-b border-gray-700/20 flex justify-between items-center bg-black/30 backdrop-blur-sm">
+          <h3 className="text-lg font-medium text-white">
             {title}
           </h3>
           <button
             type="button"
-            className="text-gray-400 hover:text-gray-500 focus:outline-none"
+            className="text-gray-400 hover:text-white focus:outline-none transition-colors"
             onClick={onClose}
           >
             <span className="sr-only">Close</span>
@@ -83,31 +83,18 @@ export default function Modal({ isOpen, onClose, children, title, footer }: Moda
         {/* Modal content - scrollable with always visible scrollbar */}
         <div
           ref={contentRef}
-          className="px-6 py-4 custom-scrollbar flex-grow overflow-auto"
+          className="px-6 py-6 custom-scrollbar flex-grow overflow-auto text-gray-100"
           style={{
-            minHeight: footer ? '200px' : '300px', // Smaller min height when footer is present
-            maxHeight: footer ? 'calc(80vh - 180px)' : 'calc(80vh - 100px)', // Adjust max height for footer
+            minHeight: footer ? '300px' : '400px', // Larger min height
+            maxHeight: footer ? 'calc(85vh - 180px)' : 'calc(85vh - 100px)', // Adjust max height for footer
           }}
         >
-          {/* Spacer to ensure content is scrollable */}
-          <div className="absolute top-0 right-0 w-px h-[1500px] opacity-0 pointer-events-none" aria-hidden="true"></div>
-          
           {children}
-          
-          {/* Visual indicator that content is scrollable */}
-          {!footer && (
-            <div className="sticky bottom-0 text-center text-xs text-gray-500 dark:text-gray-400 mt-4 pb-2 bg-gradient-to-t from-white dark:from-gray-900 pt-4">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline-block animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-              <span className="ml-1">Scroll for more</span>
-            </div>
-          )}
         </div>
         
-        {/* Fixed footer */}
+        {/* Fixed footer - glassmorphic */}
         {footer && (
-          <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+          <div className="px-6 py-4 border-t border-gray-700/20 bg-black/30 backdrop-blur-sm">
             {footer}
           </div>
         )}
