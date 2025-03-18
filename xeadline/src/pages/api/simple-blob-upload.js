@@ -1,4 +1,4 @@
-import { put } from '@vercel/blob';
+import { storageService } from '../../services/storage';
 import formidable from 'formidable';
 import fs from 'fs';
 
@@ -15,7 +15,6 @@ export default async function handler(req, res) {
 
   try {
     console.log('Simple Blob upload API called');
-    console.log('BLOB_READ_WRITE_TOKEN exists:', !!process.env.BLOB_READ_WRITE_TOKEN);
     
     // Parse the form data
     const form = formidable({
@@ -64,15 +63,18 @@ export default async function handler(req, res) {
     const fileContent = fs.readFileSync(filePath);
     console.log('File content read, size:', fileContent.length);
     
-    // Upload to Vercel Blob
-    console.log('Uploading to Vercel Blob...');
-    const blob = await put(fileName, fileContent, {
-      access: 'public',
+    // Upload using the storage service
+    console.log('Uploading using Storage Service...');
+    const result = await storageService.store(fileContent, {
       contentType: file.mimetype || file.type || 'application/octet-stream',
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+      metadata: {
+        fileName,
+        originalName,
+        ...fields // Include any other fields from the form
+      }
     });
     
-    console.log('Upload successful, URL:', blob.url);
+    console.log('Upload successful, URL:', result.url);
     
     // Clean up the temp file
     try {
@@ -84,11 +86,11 @@ export default async function handler(req, res) {
     
     // Return the URL of the uploaded file
     return res.status(200).json({
-      url: blob.url,
+      url: result.url,
       success: true,
     });
   } catch (error) {
-    console.error('Error uploading to Vercel Blob:', error);
+    console.error('Error uploading file:', error);
     console.error('Error stack:', error.stack);
     
     return res.status(500).json({

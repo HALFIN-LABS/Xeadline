@@ -1,9 +1,10 @@
 /**
- * Utility functions for Vercel Blob storage
+ * Utility functions for file storage using the Storage Service abstraction
  */
+import { storageService } from '../services/storage';
 
 /**
- * Uploads a file to Vercel Blob storage
+ * Uploads a file to storage
  * @param file The file to upload
  * @param imageType The type of image (icon or banner)
  * @param topicId Optional topic ID
@@ -31,56 +32,31 @@ export async function uploadToBlob(
       throw new Error('File too large. Maximum size is 5MB.');
     }
     
-    console.log('Using FormData approach with /api/simple-blob-upload');
+    // Generate a unique filename
+    const timestamp = Date.now();
+    const fileExtension = file.name.split('.').pop() || 'jpg';
+    const fileName = `${imageType}${topicId ? `-${topicId}` : ''}-${timestamp}.${fileExtension}`;
+    
+    console.log('Using Storage Service to upload file');
     console.log('File details:', {
       name: file.name,
       type: file.type,
       size: file.size
     });
     
-    // Create a FormData object
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('imageType', imageType);
-    if (topicId) {
-      formData.append('topicId', topicId);
-    }
-    
-    // Send the file to our Vercel Blob API endpoint using FormData
-    console.log('Sending request to /api/simple-blob-upload');
-    const response = await fetch('/api/simple-blob-upload', {
-      method: 'POST',
-      body: formData,
+    // Use the storage service to store the file
+    const result = await storageService.store(file, {
+      contentType: file.type,
+      metadata: {
+        fileName,
+        imageType,
+        topicId: topicId || '',
+      }
     });
     
-    console.log('Response status:', response.status, response.statusText);
+    console.log('Upload successful, URL:', result.url);
     
-    console.log('Response status:', response.status, response.statusText);
-    
-    // Handle non-JSON responses (like 404 HTML pages)
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      const responseText = await response.text();
-      console.error('Non-JSON response received:', responseText);
-      throw new Error(`Server returned ${response.status} with non-JSON response: ${responseText.substring(0, 100)}...`);
-    }
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Upload error:', errorData);
-      throw new Error(errorData.error || `Failed to upload image: ${response.status} ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    
-    if (!data.url) {
-      console.error('No URL in response data:', data);
-      throw new Error('No URL returned from upload');
-    }
-    
-    console.log('Upload successful, URL:', data.url);
-    
-    return data.url;
+    return result.url;
   } catch (error) {
     console.error('Error uploading image:', error);
     

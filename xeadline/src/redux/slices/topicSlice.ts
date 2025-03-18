@@ -259,6 +259,52 @@ export const createTopic = createAsyncThunk(
   }
 );
 
+// Helper function to count topic subscribers
+const countTopicSubscribers = async (topicId: string): Promise<number> => {
+  try {
+    // Create a filter to get all subscription events for this topic
+    const filters: Filter[] = [
+      {
+        kinds: [TOPIC_SUBSCRIPTION_KIND],
+        '#e': [topicId],
+        limit: 1000
+      }
+    ];
+
+    // Fetch all subscription events
+    const events = await nostrService.getEvents(filters);
+    console.log(`Found ${events.length} subscription events for topic ${topicId}`);
+
+    // Process events to count current subscribers
+    const subscriptionMap = new Map<string, { subscribed: boolean, timestamp: number }>();
+
+    events.forEach((event: Event) => {
+      const pubkey = event.pubkey;
+      const timestamp = event.created_at;
+      
+      // Check if this is a subscription or unsubscription event
+      const action = event.tags.find((tag: string[]) => tag[0] === 'a')?.[1];
+      const subscribed = action === 'subscribe';
+      
+      // Only update if this is a more recent event for this user
+      if (!subscriptionMap.has(pubkey) || subscriptionMap.get(pubkey)!.timestamp < timestamp) {
+        subscriptionMap.set(pubkey, { subscribed, timestamp });
+      }
+    });
+
+    // Count users who are currently subscribed
+    const subscriberCount = Array.from(subscriptionMap.values())
+      .filter(({ subscribed }) => subscribed)
+      .length;
+
+    console.log(`Counted ${subscriberCount} current subscribers for topic ${topicId}`);
+    return subscriberCount;
+  } catch (error) {
+    console.error('Error counting topic subscribers:', error);
+    return 0;
+  }
+};
+
 // Fetch topic thunk
 export const fetchTopic = createAsyncThunk(
   'topic/fetchTopic',
@@ -351,6 +397,10 @@ export const fetchTopic = createAsyncThunk(
           };
         }
         
+        // Get the actual member count
+        const memberCount = await countTopicSubscribers(topicId);
+        console.log(`Counted ${memberCount} members for topic ${topicId}`);
+
         // Create the topic object from the event
         const topic: Topic = {
           id: topicId,
@@ -366,7 +416,7 @@ export const fetchTopic = createAsyncThunk(
           moderationSettings: topicContent.moderationSettings || {
             moderationType: 'post-publication'
           },
-          memberCount: 10 // Placeholder, would need to count actual members
+          memberCount
         };
         
         console.log('Created topic object from Nostr event:', topic);
@@ -395,6 +445,11 @@ export const fetchTopic = createAsyncThunk(
       // Fall back to mock topic if all else fails
       console.log('Falling back to mock topic for ID:', topicId);
       console.log('This means the topic was not found in Nostr relays or the API');
+
+      // Get the actual member count even for mock topics
+      const memberCount = await countTopicSubscribers(topicId);
+      console.log(`Counted ${memberCount} members for mock topic ${topicId}`);
+
       const mockTopic: Topic = {
         id: topicId,
         name: `Topic ${dIdentifier}`,
@@ -409,7 +464,7 @@ export const fetchTopic = createAsyncThunk(
         moderationSettings: {
           moderationType: 'post-publication'
         },
-        memberCount: 10
+        memberCount
       };
       
       return mockTopic;
@@ -948,12 +1003,20 @@ export const topicSlice = createSlice({
       .addCase(subscribeToTopic.fulfilled, (state, action) => {
         if (!state.subscribed.includes(action.payload)) {
           state.subscribed.push(action.payload);
+          // Increment member count if topic exists in store
+          if (state.byId[action.payload]) {
+            state.byId[action.payload].memberCount = (state.byId[action.payload].memberCount || 0) + 1;
+          }
         }
       })
       
       // Unsubscribe from topic
       .addCase(unsubscribeFromTopic.fulfilled, (state, action) => {
         state.subscribed = state.subscribed.filter(id => id !== action.payload);
+        // Decrement member count if topic exists in store
+        if (state.byId[action.payload] && state.byId[action.payload].memberCount) {
+          state.byId[action.payload].memberCount = Math.max(0, state.byId[action.payload].memberCount! - 1);
+        }
       })
       
       // Update topic moderators
