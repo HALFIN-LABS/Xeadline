@@ -16,6 +16,7 @@ import { selectCurrentUser } from '../../redux/slices/authSlice';
 import Image from 'next/image';
 import Link from 'next/link';
 import TopicManagersButton from './TopicManagersButton';
+import { TopicPostCreationForm } from './TopicPostCreationForm';
 
 interface TopicDetailPageProps {
   topicId: string;
@@ -396,16 +397,23 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
         </div>
       </div>
       
-      {/* Posts would go here */}
+      {/* Post creation form */}
+      <div className="mt-6">
+        <TopicPostCreationForm
+          topicId={topicId}
+          topicName={topic.name}
+          topicRules={topic.rules?.map(rule => ({ title: rule })) || [
+            { title: "Be respectful to others", description: "Treat others as you would like to be treated" },
+            { title: "No spam or self-promotion", description: "Don't post content solely to promote yourself or your business" },
+            { title: "Stay on topic", description: "Posts should be relevant to this community" }
+          ]}
+        />
+      </div>
+      
+      {/* Posts list */}
       <div className="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Posts</h2>
-          
-          {currentUser && topic && (
-            <Link href={`/t/${topic.slug}/post/create`} className="px-4 py-2 bg-bottle-green text-white rounded-md hover:bg-bottle-green-700 transition-colors">
-              Create Post
-            </Link>
-          )}
         </div>
         
         <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-6 text-center">
