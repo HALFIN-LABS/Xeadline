@@ -1,10 +1,9 @@
 /**
- * Utility functions for file storage using the Storage Service abstraction
+ * Utility functions for file storage using the Storage Service via API
  */
-import { storageService } from '../services/storage';
 
 /**
- * Uploads a file to storage
+ * Uploads a file to storage via the server-side API
  * @param file The file to upload
  * @param imageType The type of image (icon or banner)
  * @param topicId Optional topic ID
@@ -32,28 +31,45 @@ export async function uploadToBlob(
       throw new Error('File too large. Maximum size is 5MB.');
     }
     
+    // Convert file to base64
+    const base64Data = await readFileAsDataURL(file);
+    
     // Generate a unique filename
     const timestamp = Date.now();
     const fileExtension = file.name.split('.').pop() || 'jpg';
     const fileName = `${imageType}${topicId ? `-${topicId}` : ''}-${timestamp}.${fileExtension}`;
     
-    console.log('Using Storage Service to upload file');
+    console.log('Using Storage Service API to upload file');
     console.log('File details:', {
       name: file.name,
       type: file.type,
       size: file.size
     });
     
-    // Use the storage service to store the file
-    const result = await storageService.store(file, {
-      contentType: file.type,
-      metadata: {
+    // Use the API to upload the file
+    const response = await fetch('/api/storage/upload', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        base64Data,
         fileName,
-        imageType,
-        topicId: topicId || '',
-      }
+        contentType: file.type,
+        metadata: {
+          fileName,
+          imageType,
+          topicId: topicId || '',
+        }
+      }),
     });
     
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to upload image');
+    }
+    
+    const result = await response.json();
     console.log('Upload successful, URL:', result.url);
     
     return result.url;
