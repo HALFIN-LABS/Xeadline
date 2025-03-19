@@ -46,6 +46,33 @@ export const parseItalic = (text: string): string => {
 };
 
 /**
+ * Extract the first URL from a markdown text
+ * @param text The markdown text to extract URL from
+ * @returns The first URL found or null if none
+ */
+export const extractFirstUrl = (text: string): string | null => {
+  if (!text) return null;
+  
+  // Try to find a markdown link first
+  const markdownMatch = text.match(LINK_REGEX);
+  if (markdownMatch) {
+    const urlMatch = markdownMatch[0].match(/\]\((.*?)\)/);
+    if (urlMatch && urlMatch[1]) {
+      return urlMatch[1];
+    }
+  }
+  
+  // If no markdown link, try to find a raw URL
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const rawMatch = text.match(urlRegex);
+  if (rawMatch) {
+    return rawMatch[0];
+  }
+  
+  return null;
+};
+
+/**
  * Parse all markdown in text
  * @param text The markdown text to parse
  * @param options Options for parsing
@@ -64,13 +91,9 @@ export const parseMarkdown = (
   // Process links first
   let processedText = parseMarkdownLinks(text, makeLinksClickable);
   
-  // Only process other markdown if links are clickable
-  // This ensures we don't convert markdown in the card view
-  if (makeLinksClickable) {
-    // Process bold and italic
-    processedText = parseBold(processedText);
-    processedText = parseItalic(processedText);
-  }
+  // Always process bold and italic formatting
+  processedText = parseBold(processedText);
+  processedText = parseItalic(processedText);
   
   return processedText;
 };

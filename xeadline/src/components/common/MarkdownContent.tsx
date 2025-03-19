@@ -24,21 +24,12 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({
   // Parse the markdown content
   const parsedContent = parseMarkdown(content, { makeLinksClickable });
   
-  // If links are clickable, we need to use dangerouslySetInnerHTML
-  // Otherwise, we can just render the text directly
-  if (makeLinksClickable) {
-    return (
-      <div 
-        className={className}
-        dangerouslySetInnerHTML={{ __html: parsedContent }}
-      />
-    );
-  }
-  
-  // For non-clickable links, just render the parsed text
+  // Always use dangerouslySetInnerHTML to render markdown content
+  // This ensures that bold and italic formatting is properly rendered
   return (
-    <div className={className}>
-      {parsedContent}
-    </div>
+    <div
+      className={className}
+      dangerouslySetInnerHTML={{ __html: parsedContent }}
+    />
   );
 };
