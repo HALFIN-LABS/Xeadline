@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 import { useSelector } from 'react-redux'
 import { eventManager } from '../../services/eventManagement'
 import { RootState } from '../../redux/store'
@@ -42,16 +42,7 @@ export const TopicPostCreationForm: React.FC<TopicPostCreationFormProps> = ({
   const [error, setError] = useState<string | null>(null)
   const currentUser = useSelector((state: RootState) => state.auth.currentUser)
   
-  // Expose the submitForm method via formRef
-  React.useEffect(() => {
-    if (formRef) {
-      formRef({
-        submitForm: () => handleSubmit()
-      });
-    }
-  }, [formRef]);
-
-  const handleSubmit = async (e?: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     
     if (!title.trim()) {
@@ -151,11 +142,23 @@ export const TopicPostCreationForm: React.FC<TopicPostCreationFormProps> = ({
     } finally {
       setIsSubmitting(false)
     }
-  }
+  }, [title, content, linkUrl, postType, topicId, tags, mediaUrls, onPostCreated])
   
-  const handleMediaUpload = (url: string) => {
+  // Expose the submitForm method via formRef
+  // Use useCallback to memoize the submitForm function
+  const submitFormCallback = React.useCallback(() => handleSubmit(), [handleSubmit]);
+  
+  React.useEffect(() => {
+    if (formRef) {
+      formRef({
+        submitForm: submitFormCallback
+      });
+    }
+  }, [formRef, submitFormCallback]);
+  
+  const handleMediaUpload = useCallback((url: string) => {
     setMediaUrls(prev => [...prev, url])
-  }
+  }, [])
   
   if (!currentUser) {
     return (
@@ -177,14 +180,14 @@ export const TopicPostCreationForm: React.FC<TopicPostCreationFormProps> = ({
             </div>
           )}
           
-          <div className="p-2">
+          <div className="p-2 w-full">
             <div className="flex items-center mb-2">
               <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
                 <span className="font-medium text-green-600 dark:text-green-400">t/{topicName}</span>
               </div>
             </div>
             
-            <Tabs className={`mb-4 ${darkMode ? 'bg-black/20 backdrop-blur-sm rounded-lg p-1' : ''}`}>
+            <Tabs className={`mb-4 ${darkMode ? 'bg-black/20 backdrop-blur-sm rounded-lg p-1 border-0 border-b-0' : 'border-0 border-b-0'}`}>
               <Tab
                 label={<div className="flex items-center">Text <Icon name="file-text" className="ml-2" /></div>}
                 active={postType === 'text'}
@@ -211,7 +214,7 @@ export const TopicPostCreationForm: React.FC<TopicPostCreationFormProps> = ({
               />
             </Tabs>
             
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} className="w-full">
               <div className="mb-4">
                 <Input
                   type="text"
@@ -220,6 +223,7 @@ export const TopicPostCreationForm: React.FC<TopicPostCreationFormProps> = ({
                   placeholder="Title"
                   className={`w-full ${darkMode ? 'bg-black/30 border-gray-700/30 text-white placeholder-gray-400 backdrop-blur-sm rounded-lg' : ''}`}
                   maxLength={300}
+                  style={{ backgroundColor: darkMode ? 'transparent' : '' }}
                 />
                 <div className="text-xs text-gray-500 text-right mt-1">
                   {title.length}/300
@@ -227,11 +231,11 @@ export const TopicPostCreationForm: React.FC<TopicPostCreationFormProps> = ({
               </div>
               
               {postType === 'text' && (
-                <div className="mb-4">
+                <div className="mb-4 w-full px-0">
                   <RichTextEditor
                     onChange={(text) => setContent(text)}
-                    placeholder="Text (optional)"
-                    className={darkMode ? 'bg-black/30 border-gray-700/30 text-white placeholder-gray-400 rounded-lg' : ''}
+                    placeholder="Text (required)"
+                    className={`w-full ${darkMode ? 'bg-black/30 border-gray-700/30 text-white placeholder-gray-400 rounded-lg' : ''}`}
                   />
                 </div>
               )}
@@ -331,7 +335,7 @@ export const TopicPostCreationForm: React.FC<TopicPostCreationFormProps> = ({
                     <RichTextEditor
                       onChange={(text) => setContent(text)}
                       placeholder="Add a caption (optional)"
-                      className={darkMode ? 'bg-black/30 border-gray-700/30 text-white placeholder-gray-400 rounded-lg' : ''}
+                      className={`w-full ${darkMode ? 'bg-black/30 border-gray-700/30 text-white placeholder-gray-400 rounded-lg' : ''}`}
                     />
                   </div>
                 </div>
@@ -345,6 +349,7 @@ export const TopicPostCreationForm: React.FC<TopicPostCreationFormProps> = ({
                     onChange={(e) => setLinkUrl(e.target.value)}
                     placeholder="URL"
                     className={`w-full ${darkMode ? 'bg-black/30 border-gray-700/30 text-white placeholder-gray-400 backdrop-blur-sm rounded-lg' : ''}`}
+                    style={{ backgroundColor: darkMode ? 'transparent' : '' }}
                   />
                 </div>
               )}
