@@ -64,6 +64,14 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
   const [showModerationModal, setShowModerationModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   
+  const handlePostModalClose = useCallback(() => {
+    setShowPostModal(false);
+  }, []);
+  
+  const handlePostModalOpen = useCallback(() => {
+    setShowPostModal(true);
+  }, []);
+  
   useEffect(() => {
     dispatch(fetchTopic(topicId));
   }, [dispatch, topicId]);
@@ -333,7 +341,7 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
               {/* Post Button */}
               <Button
                 variant="primary"
-                onClick={() => setShowPostModal(true)}
+                onClick={handlePostModalOpen}
                 className="px-4 py-2 bg-bottle-green text-white hover:bg-bottle-green-700"
               >
                 Post
@@ -425,7 +433,7 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
       {/* Post Creation Modal */}
       <PostCreationModal
         isOpen={showPostModal}
-        onClose={() => setShowPostModal(false)}
+        onClose={handlePostModalClose}
         topicId={topicId}
         topicName={topic.name}
         topicRules={topic.rules?.map(rule => ({ title: rule })) || [

@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from '../store';
 import { Filter } from 'nostr-tools';
 import nostrService from '../../services/nostr/nostrService';
+import { EVENT_TYPES } from '../../constants/eventTypes';
 
 // Define types
 export interface Post {
@@ -12,6 +13,7 @@ export interface Post {
     url?: string;
     media?: string[];
     type: 'text' | 'link' | 'media' | 'poll';
+    linkPreview?: string; // JSON string of LinkPreviewData
   };
   pubkey: string;
   topicId: string;
@@ -42,10 +44,16 @@ export const fetchPostsForTopic = createAsyncThunk(
     try {
       console.log(`Fetching posts for topic: ${topicId}`);
       
-      // Create a filter to get all posts for this topic
+      // Create filter to get all posts for this topic
       const filters: Filter[] = [
         {
-          kinds: [1], // Regular notes
+          // Query for all Xeadline custom post types
+          kinds: [
+            EVENT_TYPES.TEXT_POST,   // 33301
+            EVENT_TYPES.MEDIA_POST,  // 33302
+            EVENT_TYPES.LINK_POST,   // 33303
+            EVENT_TYPES.POLL_POST    // 33304
+          ],
           '#t': [topicId], // Filter by topic ID
           limit: 50
         }

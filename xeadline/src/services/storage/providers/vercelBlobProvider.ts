@@ -22,13 +22,23 @@ export class VercelBlobProvider implements StorageProvider {
       const fileName = options?.metadata?.fileName || `file-${Date.now()}`;
       const contentType = options?.contentType || 'application/octet-stream';
       
-      // Upload to Vercel Blob
-      const blob = await put(fileName, data, {
-        access: 'public',
-        contentType,
-        token: process.env.BLOB_READ_WRITE_TOKEN,
-        addRandomSuffix: true,
-      });
+      // Log the upload attempt
+      console.log(`Uploading file to Vercel Blob: ${fileName} (${contentType}), size: ${data instanceof File ? data.size : data instanceof Blob ? data.size : (data as Buffer).length} bytes`);
+      
+      // Upload to Vercel Blob with improved error handling
+      let blob;
+      try {
+        blob = await put(fileName, data, {
+          access: 'public',
+          contentType,
+          token: process.env.BLOB_READ_WRITE_TOKEN,
+          addRandomSuffix: true,
+        });
+        console.log('Vercel Blob upload successful:', blob.url);
+      } catch (putError) {
+        console.error('Vercel Blob put error:', putError);
+        throw new Error(`Vercel Blob upload failed: ${putError instanceof Error ? putError.message : 'Unknown error'}`);
+      }
       
       // Return the result
       return {

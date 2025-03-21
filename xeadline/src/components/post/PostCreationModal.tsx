@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 import { useAppDispatch } from '../../redux/hooks'
 import { fetchPostsForTopic } from '../../redux/slices/postSlice'
 import Modal from '../ui/Modal'
@@ -26,23 +26,23 @@ export const PostCreationModal: React.FC<PostCreationModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formRef, setFormRef] = useState<any>(null);
   
-  const handleSubmit = () => {
+  const handleSubmit = useCallback(() => {
     if (formRef && typeof formRef.submitForm === 'function') {
       formRef.submitForm();
       setIsSubmitting(true);
     }
-  };
+  }, [formRef]);
   
-  const handleFormRef = (ref: any) => {
+  const handleFormRef = useCallback((ref: any) => {
     setFormRef(ref);
-  };
+  }, []);
   
-  const handlePostCreated = () => {
+  const handlePostCreated = useCallback(() => {
     setIsSubmitting(false);
     // Refresh the posts list after a post is created
     dispatch(fetchPostsForTopic(topicId));
     onClose();
-  };
+  }, [dispatch, topicId, onClose]);
   
   return (
     <Modal
@@ -74,7 +74,7 @@ export const PostCreationModal: React.FC<PostCreationModalProps> = ({
         <div className="flex flex-col space-y-4">
           <div className="glassmorphic-content relative">
             {/* Glassmorphic glow effect */}
-            <div className="absolute -inset-1 bg-gradient-to-r from-green-600/20 to-blue-600/20 rounded-lg blur-xl opacity-30"></div>
+            <div className="absolute -inset-1 bg-gradient-to-r from-green-600/20 to-blue-600/20 rounded-lg blur-xl opacity-30 pointer-events-none"></div>
             <TopicPostCreationForm
               topicId={topicId}
               topicName={topicName}

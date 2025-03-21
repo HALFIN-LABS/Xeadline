@@ -1,31 +1,35 @@
 'use client'
 
 import React from 'react'
-import { 
-  FileText, 
-  Image, 
-  Link, 
-  BarChart2, 
-  Tag, 
-  MessageCircle, 
-  Zap, 
+import {
+  FileText,
+  Image,
+  Link,
+  BarChart2,
+  Tag,
+  MessageCircle,
+  Zap,
   Share,
   Video,
-  Gift
+  Gift,
+  Play,
+  Check
 } from 'react-feather'
 
 // Define all available icons
-type IconName = 
-  | 'file-text' 
-  | 'image' 
-  | 'link' 
-  | 'bar-chart-2' 
-  | 'tag' 
-  | 'message-circle' 
-  | 'zap' 
+type IconName =
+  | 'file-text'
+  | 'image'
+  | 'link'
+  | 'bar-chart-2'
+  | 'tag'
+  | 'message-circle'
+  | 'zap'
   | 'share'
   | 'video'
   | 'gift'
+  | 'play'
+  | 'check'
 
 interface IconProps {
   name: IconName
@@ -62,6 +66,10 @@ export const Icon: React.FC<IconProps> = ({
         return <Video size={size} color={color} />
       case 'gift':
         return <Gift size={size} color={color} />
+      case 'play':
+        return <Play size={size} color={color} />
+      case 'check':
+        return <Check size={size} color={color} />
       default:
         return null
     }

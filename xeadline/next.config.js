@@ -9,6 +9,14 @@ const nextConfig = {
     // Ignore TypeScript errors during production build
     ignoreBuildErrors: true,
   },
+  api: {
+    // Increase the body parser size limit for API routes
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+    // Increase response limit
+    responseLimit: '10mb',
+  },
   // Disable file watching completely to work around Watchpack issues
   onDemandEntries: {
     // Period (in ms) where the server will keep pages in the buffer
@@ -59,7 +67,7 @@ const nextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live; script-src-elem 'self' 'unsafe-inline' https://vercel.live; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; font-src 'self'; object-src 'none'; media-src 'self'; frame-src 'self';"
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live; script-src-elem 'self' 'unsafe-inline' https://vercel.live; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; font-src 'self'; object-src 'none'; media-src 'self' blob: https:; frame-src 'self';"
           },
           {
             key: 'X-Content-Type-Options',
@@ -73,6 +81,17 @@ const nextConfig = {
             key: 'X-XSS-Protection',
             value: '1; mode=block'
           }
+        ]
+      },
+      {
+        // Add CORS headers for media files
+        source: '/api/storage/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Credentials', value: 'true' },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET,OPTIONS,POST' },
+          { key: 'Access-Control-Allow-Headers', value: 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version' },
+          { key: 'Cache-Control', value: 'public, max-age=31536000' }
         ]
       }
     ];

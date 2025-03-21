@@ -7,6 +7,7 @@ import { useUserProfileWithCache } from '../../hooks/useUserProfileWithCache'
 import { MarkdownContent } from '../common/MarkdownContent'
 import { LinkPreview } from '../common/LinkPreview'
 import { extractFirstUrl } from '../../utils/markdownUtils'
+import { EmbeddedContent } from '../editor/EmbeddedContent'
 
 interface PostCardProps {
   post: Post;
@@ -19,7 +20,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, topicName }) => {
   
   // Determine the post type
   const hasMedia = post.content.type === 'media' && post.content.media && post.content.media.length > 0
-  const isTextPost = post.content.type === 'text' || (post.content.type === 'media' && !hasMedia)
+  const isTextPost = post.content.type === 'text'
   const isLinkPost = post.content.type === 'link'
   
   // Extract the first URL from the post content for link preview
@@ -28,12 +29,12 @@ export const PostCard: React.FC<PostCardProps> = ({ post, topicName }) => {
       return post.content.url;
     }
     
-    if (isTextPost && post.content.text) {
+    if ((isTextPost || post.content.type === 'media') && post.content.text) {
       return extractFirstUrl(post.content.text);
     }
     
     return null;
-  }, [isLinkPost, isTextPost, post.content]);
+  }, [isLinkPost, isTextPost, post.content, post.content.type]);
   
   return (
     <div className="rounded-xl hover:bg-gray-50 hover:shadow-md dark:hover:bg-gray-800/80 overflow-hidden flex flex-col md:flex-row transition-all">
@@ -59,22 +60,36 @@ export const PostCard: React.FC<PostCardProps> = ({ post, topicName }) => {
           </h2>
         </div>
         
-        {/* Media content (if any) */}
+        {/* Media content - displayed below the title for media posts */}
         {hasMedia && post.content.media && post.content.media.length > 0 && (
-          <div className="relative h-64 bg-gray-100 dark:bg-gray-700 flex-grow">
-            {post.content.media.map((url, index) => (
-              <div key={index} className="absolute inset-0 flex items-center justify-center">
-                <img
-                  src={url}
-                  alt={`Media ${index + 1}`}
-                  className="w-full h-full object-cover"
+          <div className="px-3 pb-2">
+            <div className="relative w-full aspect-square bg-gray-100 dark:bg-gray-700 overflow-hidden rounded-md">
+              <img
+                src={post.content.media[0]} // Show the first media item
+                alt="Media content"
+                className="w-full h-full object-cover"
+              />
+              {post.content.media.length > 1 && (
+                <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded-md">
+                  +{post.content.media.length - 1}
+                </div>
+              )}
+            </div>
+            
+            {/* Caption for media posts */}
+            {post.content.text && (
+              <div className="mt-2">
+                <MarkdownContent
+                  content={post.content.text}
+                  makeLinksClickable={false}
+                  className="text-sm text-gray-700 dark:text-gray-300"
                 />
               </div>
-            ))}
+            )}
           </div>
         )}
         
-        {/* Link content */}
+        {/* Link content with preview below */}
         {isLinkPost && post.content.url && (
           <div className="px-3 pb-2 flex-grow">
             <a
@@ -85,6 +100,25 @@ export const PostCard: React.FC<PostCardProps> = ({ post, topicName }) => {
             >
               {post.content.url}
             </a>
+            
+            {/* Link preview */}
+            <div className="mt-3">
+              {post.content.linkPreview ? (
+                <div className="link-preview-container">
+                  <EmbeddedContent
+                    content={post.content.linkPreview}
+                    className="link-post-preview"
+                  />
+                </div>
+              ) : (
+                <div className="link-preview-container">
+                  <LinkPreview
+                    url={post.content.url}
+                    className="link-post-preview"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         )}
         
@@ -140,8 +174,8 @@ export const PostCard: React.FC<PostCardProps> = ({ post, topicName }) => {
         </div>
       </div>
       
-      {/* Link preview - only show if a URL is found and not already a link post */}
-      {firstUrl && !isLinkPost && (
+      {/* Link preview for text posts with links */}
+      {firstUrl && !isLinkPost && !hasMedia && (
         <div className="md:w-[160px] md:min-w-[160px] md:max-w-[160px] p-2 md:self-end">
           <LinkPreview url={firstUrl} className="h-full" />
         </div>

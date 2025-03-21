@@ -17,7 +17,13 @@ export default function Modal({ isOpen, onClose, children, title, footer }: Moda
   // Close modal when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+      // Only close if clicking on the backdrop, not on any modal content
+      const target = event.target as HTMLElement;
+      if (
+        modalRef.current &&
+        !modalRef.current.contains(target) &&
+        target.classList.contains('modal-backdrop')
+      ) {
         onClose();
       }
     }
@@ -56,7 +62,7 @@ export default function Modal({ isOpen, onClose, children, title, footer }: Moda
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
     {/* Backdrop - glassmorphic effect */}
-    <div className="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm transition-opacity" />
+    <div className="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm transition-opacity modal-backdrop" />
     
     {/* Modal - true glassmorphic effect */}
     <div

@@ -210,15 +210,18 @@ export const LinkPreview: React.FC<LinkPreviewProps> = ({
     return null // Don't show anything if there's an error
   }
   
+  // Check if this is a link-post preview (from className)
+  const isLinkPost = className.includes('link-post-preview')
+  
   // Render the link preview with the Open Graph data
   return (
-    <a 
-      href={url} 
-      target="_blank" 
+    <a
+      href={url}
+      target="_blank"
       rel="noopener noreferrer"
       className={`block rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow ${className}`}
     >
-      <div className="relative h-24 bg-gray-100 dark:bg-gray-800">
+      <div className={`relative ${isLinkPost ? 'h-48' : 'h-24'} bg-gray-100 dark:bg-gray-800`}>
         {ogData?.image ? (
           // If we have an image from OG data, display it
           <div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: `url(${ogData.image})` }}></div>
@@ -229,11 +232,16 @@ export const LinkPreview: React.FC<LinkPreviewProps> = ({
           </div>
         )}
       </div>
-      <div className="p-1.5 bg-white dark:bg-gray-800">
-        <div className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">
+      <div className={`${isLinkPost ? 'p-3' : 'p-1.5'} bg-white dark:bg-gray-800`}>
+        <div className={`${isLinkPost ? 'text-sm' : 'text-xs'} font-medium text-gray-800 dark:text-gray-200 ${isLinkPost ? 'line-clamp-2' : 'truncate'}`}>
           {ogData?.title || url}
         </div>
-        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+        {isLinkPost && ogData?.description && (
+          <div className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-1">
+            {ogData.description}
+          </div>
+        )}
+        <div className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">
           {ogData?.siteName || domain}
         </div>
       </div>

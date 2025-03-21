@@ -28,7 +28,7 @@ After examining the codebase, we've identified the following:
 
 ## Implementation Strategy
 
-We'll implement the content management system in four phases:
+We'll implement the content management system in five phases:
 
 ### Phase 1: Topic Page Post Creation (1 Week)
 
@@ -41,16 +41,18 @@ Implement post creation functionality on topic pages, using the visual styling (
 4. Add proper error handling and loading states
 5. Ensure consistent styling with existing pages
 
-### Phase 2: Rich Text Editor (1 Week)
+### ~~Phase 2: Rich Text Editor (1 Week)~~ [DEFERRED]
 
-Implement a full-featured rich text editor with formatting controls.
+**Note: Phase 2 implementation has been deferred due to integration issues encountered in previous attempts. We will continue using the simplified text editor for now.**
 
-**Tasks**:
-1. Evaluate and integrate a rich text editor library (e.g., Slate, TipTap, or Lexical)
-2. Implement basic formatting controls (bold, italic, lists, links)
-3. Add support for code blocks with syntax highlighting
-4. Create custom formatting options specific to Xeadline
-5. Ensure accessibility compliance
+~~Implement a full-featured rich text editor with formatting controls.~~
+
+~~**Tasks**:~~
+~~1. Evaluate and integrate a rich text editor library (e.g., Slate, TipTap, or Lexical)~~
+~~2. Implement basic formatting controls (bold, italic, lists, links)~~
+~~3. Add support for code blocks with syntax highlighting~~
+~~4. Create custom formatting options specific to Xeadline~~
+~~5. Ensure accessibility compliance~~
 
 ### Phase 3: Media Integration (1 Week)
 
@@ -698,75 +700,99 @@ return (
 );
 ```
 
-### Phase 2: Rich Text Editor
+### Phase 2: Basic Text Editor Improvements
 
-We'll implement a rich text editor using Lexical, which is a flexible and extensible editor framework:
+Instead of implementing a full-featured rich text editor with an external library (which caused issues in previous attempts), we'll improve the existing basic text editor:
 
 ```tsx
 // src/components/editor/RichTextEditor.tsx
-import React from 'react';
-import { LexicalComposer } from '@lexical/react/LexicalComposer';
-import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
-import { ContentEditable } from '@lexical/react/LexicalContentEditable';
-import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin';
-import { AutoFocusPlugin } from '@lexical/react/LexicalAutoFocusPlugin';
-import { LinkPlugin } from '@lexical/react/LexicalLinkPlugin';
-import { ListPlugin } from '@lexical/react/LexicalListPlugin';
-import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPlugin';
-import { TRANSFORMERS } from '@lexical/markdown';
+'use client'
 
-import { EditorToolbar } from './EditorToolbar';
-import { theme } from './editorTheme';
+import React, { useState } from 'react'
+import { TextArea } from '../ui/TextArea'
 
 interface RichTextEditorProps {
-  onChange: (content: string, rawContent: any) => void;
-  placeholder?: string;
-  initialContent?: string;
+  onChange: (text: string) => void
+  placeholder?: string
+  initialContent?: string
+  className?: string
 }
 
 export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   onChange,
   placeholder = 'Write something...',
-  initialContent = ''
+  initialContent = '',
+  className = ''
 }) => {
-  const initialConfig = {
-    namespace: 'XeadlineEditor',
-    theme,
-    onError: (error: Error) => console.error(error),
-    nodes: [
-      // Node configuration
-    ]
-  };
-  
+  const [content, setContent] = useState(initialContent)
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newContent = e.target.value
+    setContent(newContent)
+    onChange(newContent)
+  }
+
+  // Apply basic formatting functions
+  const applyBold = () => {
+    // Simple implementation - just adds ** around selected text
+    // This is a placeholder for future implementation
+    console.log('Bold formatting clicked')
+  }
+
+  const applyItalic = () => {
+    // Simple implementation - just adds * around selected text
+    // This is a placeholder for future implementation
+    console.log('Italic formatting clicked')
+  }
+
+  const applyLink = () => {
+    // Simple implementation - just adds [](url) around selected text
+    // This is a placeholder for future implementation
+    console.log('Link formatting clicked')
+  }
+
   return (
-    <LexicalComposer initialConfig={initialConfig}>
-      <div className="editor-container rounded-lg border border-gray-300 dark:border-gray-700 overflow-hidden">
-        <EditorToolbar />
-        <div className="editor-inner">
-          <RichTextPlugin
-            contentEditable={
-              <ContentEditable 
-                className="editor-input p-3 min-h-[150px] focus:outline-none" 
-                placeholder={placeholder}
-              />
-            }
-            placeholder={
-              <div className="editor-placeholder text-gray-500 p-3 absolute top-0 left-0 pointer-events-none">
-                {placeholder}
-              </div>
-            }
-          />
-          <HistoryPlugin />
-          <AutoFocusPlugin />
-          <LinkPlugin />
-          <ListPlugin />
-          <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
-          {/* Additional plugins */}
-        </div>
+    <div className={`rich-text-editor border border-gray-300 dark:border-gray-700 rounded-md overflow-hidden relative z-10 ${className}`}>
+      <div className="editor-toolbar border-b border-gray-300 dark:border-gray-700 p-2 flex items-center space-x-2">
+        <button
+          type="button"
+          className="p-1 rounded hover:bg-black/20"
+          title="Bold"
+          onClick={applyBold}
+        >
+          <span className="font-bold">B</span>
+        </button>
+        <button
+          type="button"
+          className="p-1 rounded hover:bg-black/20"
+          title="Italic"
+          onClick={applyItalic}
+        >
+          <span className="italic">I</span>
+        </button>
+        <button
+          type="button"
+          className="p-1 rounded hover:bg-black/20"
+          title="Link"
+          onClick={applyLink}
+        >
+          <span className="flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+            </svg>
+          </span>
+        </button>
       </div>
-    </LexicalComposer>
-  );
-};
+      <TextArea
+        value={content}
+        onChange={handleChange}
+        placeholder={placeholder}
+        className="border-none focus:ring-0 min-h-[150px] p-3 bg-transparent"
+      />
+    </div>
+  )
+}
 ```
 
 ### Phase 3: Media Integration
@@ -1664,10 +1690,10 @@ export const TopicSidebar: React.FC<TopicSidebarProps> = ({ topic }) => {
    - Integrate with existing event system
    - Test and ensure consistency with other pages
 
-2. **Week 2**: Implement Rich Text Editor
-   - Integrate Lexical editor
-   - Implement formatting toolbar
-   - Add basic formatting features
+2. **Week 2**: ~~Implement Rich Text Editor~~ [DEFERRED] - Continue with Basic Text Editor Improvements
+   - Improve the existing basic text editor
+   - Ensure consistent styling with the modal
+   - Implement basic formatting buttons (without external libraries)
 
 3. **Week 3**: Implement Media Integration
    - Add image, video, and GIF upload support
@@ -1728,10 +1754,10 @@ export const TopicSidebar: React.FC<TopicSidebarProps> = ({ topic }) => {
 ## Success Criteria
 
 1. Users can create posts from topic pages
-2. Rich text editor supports all required formatting options
+2. Basic text editor provides essential formatting capabilities (bold, italic, links)
 3. Media upload and embedding works reliably for images, videos, and GIFs
 4. Preview system accurately shows how content will appear
-5. Comment system supports rich text and media
+5. Comment system supports basic text formatting and media
 6. Upvote/downvote functionality works for both posts and comments
 7. Post detail page follows Reddit-like layout with action bar and sidebar
 8. Comment sorting defaults to "Most liked" with options for other sorting methods
