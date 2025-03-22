@@ -101,16 +101,16 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
   
   return (
     <div className="flex items-center space-x-2">
-      <div className="flex items-center space-x-1">
+      <div className="flex items-center border border-gray-300 dark:border-gray-700 rounded-full overflow-hidden">
         <button
           type="button"
           onClick={() => handleVote('up')}
           disabled={isSubmitting || !currentUser}
-          className={`flex items-center space-x-1 btn-transparent ${sizeClasses[size].button} rounded-full hover:bg-gray-200 ${
+          className={`flex items-center justify-center ${sizeClasses[size].button} ${
             currentVote === 'up'
               ? 'text-bottle-green'
-              : 'hover:text-bottle-green'
-          } dark:hover:bg-gray-600 dark:hover:text-bottle-green transition-colors`}
+              : 'text-gray-500 hover:text-bottle-green'
+          } dark:hover:text-bottle-green transition-colors`}
           title="Upvote"
         >
           <svg
@@ -122,18 +122,27 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
           </svg>
-          <span className="font-medium">{voteCount}</span>
         </button>
+        
+        <span className={`${sizeClasses[size].text} font-medium px-1 ${
+          currentVote === 'up'
+            ? 'text-bottle-green'
+            : currentVote === 'down'
+              ? 'text-red-500'
+              : 'text-gray-600 dark:text-gray-400'
+        }`}>
+          {voteCount}
+        </span>
         
         <button
           type="button"
           onClick={() => handleVote('down')}
           disabled={isSubmitting || !currentUser}
-          className={`flex items-center space-x-1 btn-transparent ${sizeClasses[size].button} rounded-full hover:bg-gray-200 ${
+          className={`flex items-center justify-center ${sizeClasses[size].button} ${
             currentVote === 'down'
               ? 'text-red-500'
-              : 'hover:text-red-500'
-          } dark:hover:bg-gray-600 dark:hover:text-red-500 transition-colors`}
+              : 'text-gray-500 hover:text-red-500'
+          } dark:hover:text-red-500 transition-colors`}
           title="Downvote"
         >
           <svg
@@ -145,7 +154,6 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
-          <span className="font-medium">{currentVote === 'down' ? Math.abs(voteCount) : 0}</span>
         </button>
       </div>
     </div>
