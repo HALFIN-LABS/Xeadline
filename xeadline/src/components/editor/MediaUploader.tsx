@@ -29,6 +29,7 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   darkMode = false,
   hideButtons = false
 }) => {
+  // Basic upload state
   const [isUploading, setIsUploading] = useState(false)
   const [uploadingType, setUploadingType] = useState<'image' | 'video' | 'gif' | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -41,15 +42,41 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   const [currentFile, setCurrentFile] = useState<File | null>(null)
   const [retryCount, setRetryCount] = useState(0)
   const [showRetry, setShowRetry] = useState(false)
+  
+  // Simplified progress tracking to avoid browser crashes
+  const [uploadStage, setUploadStage] = useState<'preparing' | 'uploading' | 'processing' | 'complete'>('preparing')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
   const gifInputRef = useRef<HTMLInputElement>(null)
   
-  // Register and unregister progress callback
+  // Helper function to format time remaining
+  const formatTimeRemaining = (seconds: number): string => {
+    if (seconds < 60) {
+      return `${Math.round(seconds)}s`;
+    } else if (seconds < 3600) {
+      return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+    } else {
+      return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+    }
+  };
+
+  // Register and unregister progress callback with simplified tracking
   useEffect(() => {
     if (uploadId) {
       registerProgressCallback(uploadId, (progress) => {
+        // Update basic progress
         setUploadProgress(progress);
+        
+        // Determine upload stage based on progress
+        if (progress < 5) {
+          setUploadStage('preparing');
+        } else if (progress < 90) {
+          setUploadStage('uploading');
+        } else if (progress < 100) {
+          setUploadStage('processing');
+        } else {
+          setUploadStage('complete');
+        }
       });
       
       return () => {
@@ -459,37 +486,67 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
         </div>
       )}
       
-      {/* Upload progress bar */}
+      {/* Enhanced upload progress bar */}
       {isUploading && (
         <div className="mt-3">
           <div className="flex items-center justify-between mb-1">
-            <div className="text-sm font-medium">
-              Uploading {uploadingType}... {uploadProgress}%
+            <div className="text-sm font-medium flex items-center">
+              <span className="mr-2">
+                {uploadStage === 'preparing' ? 'Preparing' :
+                 uploadStage === 'uploading' ? 'Uploading' :
+                 uploadStage === 'processing' ? 'Processing' : 'Completing'} {uploadingType}...
+              </span>
+              <span className="font-bold">{uploadProgress}%</span>
             </div>
-            {uploadingType === 'video' && (
-              <div className="text-xs text-yellow-500">
-                ⚠️ This may take several minutes
+            {uploadingType === 'video' && uploadStage === 'preparing' && (
+              <div className="text-xs text-blue-500 flex items-center">
+                <Icon name="file-text" size={12} className="mr-1" />
+                Optimizing for your connection
               </div>
             )}
           </div>
-          <div className={`w-full h-3 bg-gray-200 rounded-full overflow-hidden ${darkMode ? 'bg-gray-700' : ''}`}>
+          
+          {/* Progress bar with stages */}
+          <div className={`w-full h-4 bg-gray-200 rounded-full overflow-hidden ${darkMode ? 'bg-gray-700' : ''}`}>
             <div
               className={`h-full transition-all duration-300 ease-in-out ${
-                uploadProgress < 100 ? 'bg-blue-500' : 'bg-green-500'
+                uploadStage === 'preparing' ? 'bg-yellow-500' :
+                uploadStage === 'uploading' ? 'bg-blue-500' :
+                uploadStage === 'processing' ? 'bg-purple-500' : 'bg-green-500'
               }`}
               style={{ width: `${uploadProgress || 1}%` }}
             ></div>
           </div>
+          
+          {/* Simplified status information */}
           <div className="flex justify-between items-center text-xs text-gray-500 mt-1">
-            <span>
-              {uploadProgress < 5 ? 'Preparing upload...' :
-               uploadProgress < 95 ? 'Uploading to secure storage...' :
-               'Finalizing...'}
+            <span className="font-medium">
+              {uploadStage === 'preparing' ? 'Preparing upload...' :
+               uploadStage === 'uploading' ? 'Uploading to secure storage...' :
+               uploadStage === 'processing' ? 'Processing upload...' : 'Finalizing...'}
             </span>
             <span>
               {uploadingType === 'video' ? 'Large files may take longer' : ''}
             </span>
           </div>
+          
+          {/* Video-specific guidance */}
+          {uploadingType === 'video' && (
+            <div className="mt-2 text-xs">
+              {uploadStage === 'uploading' && (
+                <div className="flex items-center text-blue-600 dark:text-blue-400">
+                  <Icon name="file-text" size={12} className="mr-1" />
+                  <span>Video uploads use chunked uploading for reliability</span>
+                </div>
+              )}
+              {uploadStage === 'processing' && (
+                <div className="flex items-center text-purple-600 dark:text-purple-400">
+                  <Icon name="zap" size={12} className="mr-1" />
+                  <span>Processing video for optimal playback</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
       

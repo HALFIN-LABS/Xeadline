@@ -25,16 +25,39 @@ export class VercelBlobProvider implements StorageProvider {
       // Log the upload attempt
       console.log(`Uploading file to Vercel Blob: ${fileName} (${contentType}), size: ${data instanceof File ? data.size : data instanceof Blob ? data.size : (data as Buffer).length} bytes`);
       
-      // Upload to Vercel Blob with improved error handling
+      // Upload to Vercel Blob with improved error handling and explicit content type
       let blob;
       try {
+        // Ensure content type is explicitly set and preserved
+        const isVideo = contentType.startsWith('video/');
+        
+        // Log content type for debugging
+        console.log(`Uploading to Vercel Blob with content type: ${contentType}`);
+        
+        // Add specific headers for video content
+        const headers: Record<string, string> = {};
+        if (isVideo) {
+          headers['Content-Disposition'] = `inline; filename="${fileName}"`;
+          // Ensure proper MIME type is set
+          console.log('Adding video-specific headers for content type preservation');
+        }
+        
         blob = await put(fileName, data, {
           access: 'public',
-          contentType,
+          contentType, // Explicitly set content type
           token: process.env.BLOB_READ_WRITE_TOKEN,
           addRandomSuffix: true,
+          headers, // Add custom headers
         });
-        console.log('Vercel Blob upload successful:', blob.url);
+        
+        // Verify content type after upload
+        console.log(`Vercel Blob upload successful: ${blob.url}`);
+        console.log(`Uploaded content type: ${contentType}, Blob content type: ${blob.contentType || 'unknown'}`);
+        
+        // If content type doesn't match, log a warning
+        if (blob.contentType && blob.contentType !== contentType) {
+          console.warn(`Content type mismatch: Expected ${contentType}, got ${blob.contentType}`);
+        }
       } catch (putError) {
         console.error('Vercel Blob put error:', putError);
         throw new Error(`Vercel Blob upload failed: ${putError instanceof Error ? putError.message : 'Unknown error'}`);

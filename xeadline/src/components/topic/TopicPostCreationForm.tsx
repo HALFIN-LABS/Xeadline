@@ -44,6 +44,8 @@ export const TopicPostCreationForm: React.FC<TopicPostCreationFormProps> = ({
   const [content, setContent] = useState('')
   const [linkUrl, setLinkUrl] = useState('')
   const [mediaUrls, setMediaUrls] = useState<string[]>([])
+  const [mediaTypes, setMediaTypes] = useState<('image' | 'video' | 'gif')[]>([])
+  const [thumbnails, setThumbnails] = useState<string[]>([])
   const [embeddedContents, setEmbeddedContents] = useState<string[]>([]) // JSON strings of LinkPreviewData or VideoEmbedData
   const [tags, setTags] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -138,6 +140,8 @@ export const TopicPostCreationForm: React.FC<TopicPostCreationFormProps> = ({
             title,
             text: content,
             media: mediaUrls,
+            mediaTypes: mediaTypes,
+            thumbnails: thumbnails,
             embeds: embeddedContents,
             type: 'media'
           })
@@ -175,6 +179,8 @@ export const TopicPostCreationForm: React.FC<TopicPostCreationFormProps> = ({
         setContent('')
         setLinkUrl('')
         setMediaUrls([])
+        setMediaTypes([])
+        setThumbnails([])
         setEmbeddedContents([])
         setTags([])
         setError(null)
@@ -200,7 +206,7 @@ export const TopicPostCreationForm: React.FC<TopicPostCreationFormProps> = ({
     } finally {
       setIsSubmitting(false)
     }
-  }, [title, content, linkUrl, postType, topicId, tags, mediaUrls, embeddedContents, onPostCreated])
+  }, [title, content, linkUrl, postType, topicId, tags, mediaUrls, mediaTypes, thumbnails, embeddedContents, onPostCreated])
   
   // Expose the submitForm method via formRef
   // Use useCallback to memoize the submitForm function
@@ -220,8 +226,15 @@ export const TopicPostCreationForm: React.FC<TopicPostCreationFormProps> = ({
       // For embeds, the URL is actually a JSON string of LinkPreviewData or VideoEmbedData
       setEmbeddedContents(prev => [...prev, url])
     } else {
-      // For media files, add to mediaUrls
+      // For media files, add to mediaUrls and track the media type
       setMediaUrls(prev => [...prev, url])
+      setMediaTypes(prev => [...prev, type])
+      
+      // For videos, we could generate a thumbnail in the future
+      if (type === 'video') {
+        // For now, just add an empty placeholder
+        setThumbnails(prev => [...prev, ''])
+      }
     }
   }, [])
   
@@ -487,7 +500,12 @@ export const TopicPostCreationForm: React.FC<TopicPostCreationFormProps> = ({
                           <button
                             type="button"
                             className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1"
-                            onClick={() => setMediaUrls(prev => prev.filter((_, i) => i !== index))}
+                            onClick={() => {
+                              // Remove the media URL, type, and thumbnail at this index
+                              setMediaUrls(prev => prev.filter((_, i) => i !== index));
+                              setMediaTypes(prev => prev.filter((_, i) => i !== index));
+                              setThumbnails(prev => prev.filter((_, i) => i !== index));
+                            }}
                           >
                             ✕
                           </button>

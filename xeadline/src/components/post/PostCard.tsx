@@ -64,11 +64,25 @@ export const PostCard: React.FC<PostCardProps> = ({ post, topicName }) => {
         {hasMedia && post.content.media && post.content.media.length > 0 && (
           <div className="px-3 pb-2">
             <div className="relative w-full aspect-square bg-gray-100 dark:bg-gray-700 overflow-hidden rounded-md">
-              <img
-                src={post.content.media[0]} // Show the first media item
-                alt="Media content"
-                className="w-full h-full object-cover"
-              />
+              {/* Determine if the media is a video or an image based on URL or mediaTypes */}
+              {(post.content.mediaTypes?.[0] === 'video' ||
+                (post.content.media && post.content.media[0]?.match(/\.(mp4|mov|webm|avi)($|\?)/i))) ? (
+                <video
+                  src={post.content.media?.[0]}
+                  controls
+                  preload="metadata"
+                  className="w-full h-full object-contain"
+                  poster={post.content.thumbnails?.[0] || ''}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              ) : (
+                <img
+                  src={post.content.media?.[0]} // Show the first media item
+                  alt="Media content"
+                  className="w-full h-full object-cover"
+                />
+              )}
               {post.content.media.length > 1 && (
                 <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded-md">
                   +{post.content.media.length - 1}

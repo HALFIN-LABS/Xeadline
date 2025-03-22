@@ -4,16 +4,65 @@
  */
 
 /**
- * Default chunk size (2MB)
- * Increased from 1MB to reduce the number of requests
+ * Default chunk size (5MB)
+ * Increased from 2MB to reduce the number of requests while maintaining reliability
  */
-const DEFAULT_CHUNK_SIZE = 2 * 1024 * 1024;
+const DEFAULT_CHUNK_SIZE = 5 * 1024 * 1024;
 
 /**
  * Maximum number of concurrent uploads
  * This limits the number of parallel requests to avoid overwhelming the server
+ * Increased from 3 to 4 for better performance on modern connections
  */
-const MAX_CONCURRENT_UPLOADS = 3;
+const MAX_CONCURRENT_UPLOADS = 4;
+
+/**
+ * Network speed detection thresholds (bytes per second)
+ */
+const NETWORK_SPEED = {
+  SLOW: 500 * 1024, // 500 KB/s
+  MEDIUM: 2 * 1024 * 1024, // 2 MB/s
+  FAST: 10 * 1024 * 1024, // 10 MB/s
+};
+
+/**
+ * Get a conservative estimate of network speed without actual testing
+ * This avoids the potential browser crash from the network test
+ * @returns Promise resolving to the estimated network speed in bytes per second
+ */
+async function detectNetworkSpeed(): Promise<number> {
+  // Instead of actual testing which might cause browser issues,
+  // we'll use a conservative estimate based on MEDIUM speed
+  console.log('Using conservative network speed estimate');
+  return NETWORK_SPEED.MEDIUM;
+}
+
+/**
+ * Get optimal chunk size and concurrency based on network speed
+ * @param fileSize The size of the file to upload
+ * @param networkSpeed The detected network speed in bytes per second
+ * @returns Object containing optimal chunk size and concurrency
+ */
+function getOptimalChunkConfig(fileSize: number, networkSpeed: number): { chunkSize: number, concurrency: number } {
+  // For very small files, use a single chunk
+  if (fileSize < 5 * 1024 * 1024) {
+    return { chunkSize: fileSize, concurrency: 1 };
+  }
+  
+  if (networkSpeed < NETWORK_SPEED.SLOW) {
+    // Slow connection: 1MB chunks, 1-2 concurrent uploads
+    return { chunkSize: 1 * 1024 * 1024, concurrency: 2 };
+  } else if (networkSpeed < NETWORK_SPEED.MEDIUM) {
+    // Medium connection: 2MB chunks, 2-3 concurrent uploads
+    return { chunkSize: 2 * 1024 * 1024, concurrency: 3 };
+  } else if (networkSpeed < NETWORK_SPEED.FAST) {
+    // Fast connection: 5MB chunks, 3-4 concurrent uploads
+    return { chunkSize: 5 * 1024 * 1024, concurrency: 4 };
+  } else {
+    // Very fast connection: 8MB chunks, 4 concurrent uploads
+    return { chunkSize: 8 * 1024 * 1024, concurrency: 4 };
+  }
+}
 
 /**
  * Upload a file in chunks
@@ -33,17 +82,39 @@ export async function uploadFileInChunks(
   topicId: string,
   postId: string,
   onProgress?: (progress: number) => void,
-  chunkSize: number = DEFAULT_CHUNK_SIZE
+  chunkSize?: number
 ): Promise<string> {
   try {
     // Show initial progress
-    if (onProgress) onProgress(2);
+    if (onProgress) onProgress(1);
 
-    // Step 1: Initialize the chunked upload
-    const fileName = `${pathType}-${mediaType}-${topicId}-${postId}-${Date.now()}.${file.name.split('.').pop()}`;
-    const totalChunks = Math.ceil(file.size / chunkSize);
+    // Step 1: Detect network speed and determine optimal chunk size and concurrency
+    if (onProgress) onProgress(2);
+    console.log('Detecting network speed for optimal chunking...');
+    const networkSpeed = await detectNetworkSpeed();
     
-    console.log(`Starting chunked upload for ${fileName} (${file.size} bytes) in ${totalChunks} chunks of ${chunkSize} bytes each`);
+    // Get optimal chunk configuration based on network speed and file size
+    const { chunkSize: optimalChunkSize, concurrency: optimalConcurrency } =
+      getOptimalChunkConfig(file.size, networkSpeed);
+    
+    // Use provided chunk size or optimal chunk size
+    const finalChunkSize = chunkSize || optimalChunkSize;
+    
+    // Override MAX_CONCURRENT_UPLOADS with the optimal concurrency
+    const MAX_CONCURRENT_UPLOADS_OVERRIDE = optimalConcurrency;
+    
+    // Calculate total chunks
+    const totalChunks = Math.ceil(file.size / finalChunkSize);
+    
+    // Generate a unique filename with metadata
+    const fileExt = file.name.split('.').pop() || 'mp4';
+    const timestamp = Date.now();
+    const fileName = `${pathType}-${mediaType}-${topicId}-${postId}-${timestamp}.${fileExt}`;
+    
+    console.log(`Starting chunked upload for ${fileName} (${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
+    console.log(`Network speed: ${(networkSpeed / (1024 * 1024)).toFixed(2)}MB/s`);
+    console.log(`Using ${totalChunks} chunks of ${(finalChunkSize / (1024 * 1024)).toFixed(2)}MB each`);
+    console.log(`Concurrent uploads: ${MAX_CONCURRENT_UPLOADS_OVERRIDE}`);
     
     const initResponse = await fetch('/api/storage/init-chunked-upload', {
       method: 'POST',
@@ -94,8 +165,8 @@ export async function uploadFileInChunks(
     
     // Function to upload a single chunk
     const uploadChunk = async (chunkIndex: number): Promise<void> => {
-      const start = chunkIndex * chunkSize;
-      const end = Math.min(start + chunkSize, file.size);
+      const start = chunkIndex * finalChunkSize;
+      const end = Math.min(start + finalChunkSize, file.size);
       const chunk = file.slice(start, end);
       
       // Create a FormData object for this chunk
@@ -154,8 +225,8 @@ export async function uploadFileInChunks(
       
       // Process the queue
       while (queue.length > 0 || inProgress.size > 0) {
-        // Fill up to MAX_CONCURRENT_UPLOADS
-        while (queue.length > 0 && inProgress.size < MAX_CONCURRENT_UPLOADS) {
+        // Fill up to our dynamically determined concurrency limit
+        while (queue.length > 0 && inProgress.size < MAX_CONCURRENT_UPLOADS_OVERRIDE) {
           const chunkIndex = queue.shift()!;
           inProgress.add(chunkIndex);
           
@@ -173,7 +244,7 @@ export async function uploadFileInChunks(
         }
         
         // Wait for at least one to complete before continuing
-        if (inProgress.size >= MAX_CONCURRENT_UPLOADS || (queue.length === 0 && inProgress.size > 0)) {
+        if (inProgress.size >= MAX_CONCURRENT_UPLOADS_OVERRIDE || (queue.length === 0 && inProgress.size > 0)) {
           await Promise.race(
             Array.from(inProgress).map(
               chunkIndex => new Promise(resolve => {

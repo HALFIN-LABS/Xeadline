@@ -12,6 +12,8 @@ export interface Post {
     text?: string;
     url?: string;
     media?: string[];
+    mediaTypes?: ('image' | 'video' | 'gif')[];
+    thumbnails?: string[];
     type: 'text' | 'link' | 'media' | 'poll';
     linkPreview?: string; // JSON string of LinkPreviewData
   };

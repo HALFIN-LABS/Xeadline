@@ -3,6 +3,7 @@
  */
 import { uploadFileDirect } from './clientUpload';
 import { uploadFileInChunks } from './chunkedUpload';
+import { uploadDirectToBlob } from './directUpload';
 
 /**
  * Media types supported by the application
@@ -147,9 +148,9 @@ export async function uploadToBlob(
       }
     }
     
-    // For videos, use chunked uploads for better performance and reliability
+    // For videos, try direct upload first, then fall back to chunked uploads
     if (mediaType === 'video') {
-      console.log('Using chunked upload for video file');
+      console.log('Using direct upload for video file');
       
       try {
         // Set up progress tracking
@@ -157,38 +158,56 @@ export async function uploadToBlob(
           updateProgress(uniqueUploadId, progress);
         };
         
-        // Determine chunk size based on file size
-        // Larger files get larger chunks to reduce the number of requests
-        let chunkSize = 2 * 1024 * 1024; // 2MB default (increased from 1MB)
-        
-        if (file.size > 100 * 1024 * 1024) {
-          chunkSize = 8 * 1024 * 1024; // 8MB for files > 100MB
-        } else if (file.size > 50 * 1024 * 1024) {
-          chunkSize = 5 * 1024 * 1024; // 5MB for files > 50MB
-        } else if (file.size > 20 * 1024 * 1024) {
-          chunkSize = 3 * 1024 * 1024; // 3MB for files > 20MB
+        // First try the new direct upload method for best performance
+        try {
+          console.log('Attempting direct upload to Vercel Blob');
+          const url = await uploadDirectToBlob(
+            file,
+            fileType,
+            mediaType,
+            topicId || 'default',
+            postId || 'new-post',
+            onProgress
+          );
+          
+          console.log('Direct upload successful, URL:', url);
+          return url;
+        } catch (directUploadError) {
+          console.error('Error during direct upload:', directUploadError);
+          console.log('Falling back to chunked upload method');
+          
+          // Determine chunk size based on file size
+          // Larger files get larger chunks to reduce the number of requests
+          let chunkSize = 2 * 1024 * 1024; // 2MB default (increased from 1MB)
+          
+          if (file.size > 100 * 1024 * 1024) {
+            chunkSize = 8 * 1024 * 1024; // 8MB for files > 100MB
+          } else if (file.size > 50 * 1024 * 1024) {
+            chunkSize = 5 * 1024 * 1024; // 5MB for files > 50MB
+          } else if (file.size > 20 * 1024 * 1024) {
+            chunkSize = 3 * 1024 * 1024; // 3MB for files > 20MB
+          }
+          
+          console.log(`Using chunk size of ${chunkSize / (1024 * 1024)}MB for ${file.size / (1024 * 1024)}MB file`);
+          
+          // Use the chunked upload method
+          const url = await uploadFileInChunks(
+            file,
+            fileType,
+            mediaType,
+            topicId || 'default',
+            postId || 'new-post',
+            onProgress
+          );
+          
+          console.log('Chunked upload successful, URL:', url);
+          return url;
         }
+      } catch (allUploadsError) {
+        console.error('All upload methods failed:', allUploadsError);
         
-        console.log(`Using chunk size of ${chunkSize / (1024 * 1024)}MB for ${file.size / (1024 * 1024)}MB file`);
-        
-        // Use the chunked upload method
-        const url = await uploadFileInChunks(
-          file,
-          fileType,
-          mediaType,
-          topicId || 'default',
-          postId || 'new-post',
-          onProgress,
-          chunkSize
-        );
-        
-        console.log('Chunked upload successful, URL:', url);
-        return url;
-      } catch (chunkedUploadError) {
-        console.error('Error during chunked upload:', chunkedUploadError);
-        
-        // Fall back to the direct upload method if chunked upload fails
-        console.log('Falling back to direct upload method');
+        // Last resort: try the legacy direct upload method
+        console.log('Trying legacy direct upload as last resort');
         
         try {
           // Set up progress tracking
@@ -196,7 +215,7 @@ export async function uploadToBlob(
             updateProgress(uniqueUploadId, progress);
           };
           
-          // Use the direct upload method as fallback
+          // Use the legacy direct upload method as fallback
           const url = await uploadFileDirect(
             file,
             fileType,
@@ -206,10 +225,10 @@ export async function uploadToBlob(
             onProgress
           );
           
-          console.log('Fallback upload successful, URL:', url);
+          console.log('Legacy fallback upload successful, URL:', url);
           return url;
         } catch (fallbackError) {
-          console.error('Error during fallback upload:', fallbackError);
+          console.error('Error during legacy fallback upload:', fallbackError);
           throw new Error(`Video upload error: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`);
         }
       }
