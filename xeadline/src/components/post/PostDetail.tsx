@@ -5,6 +5,9 @@ import Link from 'next/link'
 import { Post } from '../../redux/slices/postSlice'
 import { useUserProfileWithCache } from '../../hooks/useUserProfileWithCache'
 import { MarkdownContent } from '../common/MarkdownContent'
+import { CommentList } from '../comments/CommentList'
+import { VoteButton } from '../comments/VoteButton'
+import { QuickCommentInput } from '../comments/QuickCommentInput'
 
 interface PostDetailProps {
   post: Post
@@ -86,21 +89,14 @@ export const PostDetail: React.FC<PostDetailProps> = ({ post, topicName }) => {
       
       {/* Post actions */}
       <div className="px-4 py-3 flex items-center space-x-3 text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex items-center space-x-2">
-          <button className="flex items-center space-x-1 btn-transparent px-2 py-1 rounded-full hover:bg-gray-200 hover:text-bottle-green dark:hover:bg-gray-600 dark:hover:text-bottle-green transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-            </svg>
-            <span className="font-medium">{post.likes || 0}</span>
-          </button>
-          
-          <button className="flex items-center space-x-1 btn-transparent px-2 py-1 rounded-full hover:bg-gray-200 hover:text-red-500 dark:hover:bg-gray-600 dark:hover:text-red-500 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-            <span className="font-medium">0</span>
-          </button>
-        </div>
+        <VoteButton
+          contentId={post.id}
+          contentType="post"
+          initialVotes={post.likes || 0}
+          initialVote={post.userVote}
+          size="md"
+          darkMode={typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches}
+        />
         
         <button className="flex items-center space-x-1 btn-transparent px-2 py-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -124,12 +120,17 @@ export const PostDetail: React.FC<PostDetailProps> = ({ post, topicName }) => {
         </button>
       </div>
       
-      {/* Comments section placeholder */}
+      {/* Quick comment input */}
       <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-semibold mb-4">Comments</h3>
-        <div className="text-gray-500 dark:text-gray-400 text-center py-8">
-          Comments will be implemented in a future update
-        </div>
+        <QuickCommentInput
+          postId={post.id}
+          darkMode={typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches}
+        />
+      </div>
+      
+      {/* Comments section */}
+      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+        <CommentList postId={post.id} darkMode={typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches} />
       </div>
     </div>
   )

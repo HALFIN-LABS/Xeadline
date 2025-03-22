@@ -23,6 +23,7 @@ export interface Post {
   tags: string[][];
   likes: number;
   comments: number;
+  userVote?: 'up' | 'down' | null; // User's vote on this post
 }
 
 export interface PostState {

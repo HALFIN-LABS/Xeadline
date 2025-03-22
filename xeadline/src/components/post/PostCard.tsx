@@ -8,6 +8,7 @@ import { MarkdownContent } from '../common/MarkdownContent'
 import { LinkPreview } from '../common/LinkPreview'
 import { extractFirstUrl } from '../../utils/markdownUtils'
 import { EmbeddedContent } from '../editor/EmbeddedContent'
+import { VoteButton } from '../comments/VoteButton'
 
 interface PostCardProps {
   post: Post;
@@ -149,21 +150,14 @@ export const PostCard: React.FC<PostCardProps> = ({ post, topicName }) => {
         
         {/* Post actions */}
         <div className="px-3 py-2 flex items-center space-x-2 text-gray-500 dark:text-gray-400 text-xs">
-          <div className="flex items-center space-x-2">
-            <button className="flex items-center space-x-1 btn-transparent px-2 py-1 rounded-full hover:bg-gray-200 hover:text-bottle-green dark:hover:bg-gray-600 dark:hover:text-bottle-green transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-              </svg>
-              <span className="font-medium">{post.likes || 0}</span>
-            </button>
-            
-            <button className="flex items-center space-x-1 btn-transparent px-2 py-1 rounded-full hover:bg-gray-200 hover:text-red-500 dark:hover:bg-gray-600 dark:hover:text-red-500 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-              <span className="font-medium">0</span>
-            </button>
-          </div>
+          <VoteButton
+            contentId={post.id}
+            contentType="post"
+            initialVotes={post.likes || 0}
+            initialVote={post.userVote}
+            size="sm"
+            darkMode={typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches}
+          />
           
           <button className="flex items-center space-x-1 btn-transparent px-2 py-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
