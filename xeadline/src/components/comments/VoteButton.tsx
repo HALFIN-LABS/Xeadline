@@ -37,10 +37,12 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
   // Make sure we update if initialVote changes
   useEffect(() => {
     console.log(`Initial vote changed for ${contentId}: ${initialVote}`)
-    if (initialVote !== null) {
-      setCurrentVote(initialVote)
-    }
-  }, [contentId, initialVote])
+    // Always set the current vote to the initial vote, even if it's null
+    setCurrentVote(initialVote)
+    
+    // Log the current user to help debug
+    console.log(`Current user: ${currentUser?.publicKey?.substring(0, 8) || 'none'}`)
+  }, [contentId, initialVote, currentUser])
   
   // Size classes for the buttons and text
   const sizeClasses = {

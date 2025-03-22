@@ -16,6 +16,11 @@ export async function fetchReactionsForContent(
   }
 
   console.log(`Fetching reactions for ${contentIds.length} content items`);
+  if (currentUserPubkey) {
+    console.log(`Current user pubkey: ${currentUserPubkey.substring(0, 8)}...`);
+  } else {
+    console.log('No current user pubkey provided');
+  }
 
   // Create filter to get all reactions for these content IDs
   const filters: Filter[] = [
@@ -74,6 +79,8 @@ export async function fetchReactionsForContent(
 
       // Check if this is the current user's vote
       if (currentUserPubkey && event.pubkey === currentUserPubkey) {
+        console.log(`Comparing pubkeys: ${event.pubkey.substring(0, 8)} vs ${currentUserPubkey.substring(0, 8)}`);
+        
         if (isUpvote) {
           reactionsByContent[contentId].userVote = 'up';
           console.log(`Found user vote for ${contentId}: UP from ${event.pubkey.substring(0, 8)}`);
@@ -81,6 +88,8 @@ export async function fetchReactionsForContent(
           reactionsByContent[contentId].userVote = 'down';
           console.log(`Found user vote for ${contentId}: DOWN from ${event.pubkey.substring(0, 8)}`);
         }
+      } else if (currentUserPubkey) {
+        console.log(`Not a match: ${event.pubkey.substring(0, 8)} vs ${currentUserPubkey.substring(0, 8)}`);
       }
     } catch (error) {
       console.error(`Error processing reaction event ${event.id}:`, error);
