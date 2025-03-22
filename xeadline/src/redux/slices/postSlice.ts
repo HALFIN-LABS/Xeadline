@@ -3,6 +3,7 @@ import { RootState } from '../store';
 import { Filter } from 'nostr-tools';
 import nostrService from '../../services/nostr/nostrService';
 import { fetchReactionsForContent } from '../../services/nostr/reactionService';
+import { fetchVotesForContent } from './voteSlice';
 import { EVENT_TYPES } from '../../constants/eventTypes';
 
 // Define types
@@ -120,6 +121,10 @@ export const fetchPostsForTopic = createAsyncThunk(
           post.userVote = reactions[post.id].userVote;
         }
       }
+      
+      // Also dispatch the fetchVotesForContent action to update the vote store
+      // This ensures votes are available in the Redux store for components
+      thunkAPI.dispatch(fetchVotesForContent(postIds));
       
       // Sort posts by creation time (newest first)
       posts.sort((a, b) => b.createdAt - a.createdAt);

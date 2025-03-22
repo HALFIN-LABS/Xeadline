@@ -28,7 +28,17 @@ export async function fetchReactionsForContent(
 
   // Fetch reaction events from Nostr relays
   const events = await nostrService.getEvents(filters);
-  console.log(`Found ${events.length} reaction events`);
+  console.log(`Found ${events.length} reaction events for ${contentIds.length} content items`);
+  
+  // Debug: Log the first few events
+  if (events.length > 0) {
+    console.log('Sample reaction events:', events.slice(0, 3).map(e => ({
+      id: e.id,
+      pubkey: e.pubkey.substring(0, 8) + '...',
+      content: e.content,
+      tags: e.tags
+    })));
+  }
 
   // Process events to count reactions for each content ID
   const reactionsByContent: Record<string, { 

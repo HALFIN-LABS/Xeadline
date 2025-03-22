@@ -37,13 +37,18 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
   
   // Update local state when Redux store changes
   useEffect(() => {
-    if (storedVote !== undefined) {
+    if (storedVote !== undefined && storedVote !== null) {
       setCurrentVote(storedVote)
     }
     if (storedCount !== undefined) {
       setVoteCount(storedCount)
     }
   }, [storedVote, storedCount])
+
+  // Debug log
+  useEffect(() => {
+    console.log(`VoteButton for ${contentId}: vote=${currentVote}, count=${voteCount}, stored vote=${storedVote}, stored count=${storedCount}`)
+  }, [contentId, currentVote, voteCount, storedVote, storedCount])
   
   // Size classes for the buttons and text
   const sizeClasses = {
@@ -65,15 +70,20 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
   }
   
   const handleVote = async (vote: 'up' | 'down') => {
-    if (!currentUser) return
+    if (!currentUser) {
+      console.log('Cannot vote: No current user')
+      return
+    }
     
     // If already voted the same way, remove the vote
     const newVote = currentVote === vote ? null : vote
+    console.log(`Voting on ${contentId}: ${currentVote} -> ${newVote}`)
     
     setIsSubmitting(true)
     
     try {
       // Create vote event
+      console.log(`Creating vote event for ${contentId}: ${newVote === 'up' ? '+' : newVote === 'down' ? '-' : ''}`)
       const event = await eventManager.createEvent(
         7, // kind 7 = reaction
         newVote === 'up' ? '+' : newVote === 'down' ? '-' : '',
@@ -81,7 +91,9 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
       )
       
       // Sign and publish
+      console.log(`Signing and publishing vote event for ${contentId}`)
       const result = await eventManager.signAndPublishEvent(event)
+      console.log(`Vote event result:`, result)
       
       if (result.success) {
         // Calculate new vote count
@@ -105,6 +117,7 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
         setCurrentVote(newVote)
         
         // Update the Redux store
+        console.log(`Dispatching updateVote for ${contentId}: ${newVote}, count: ${newCount}`)
         dispatch(updateVote({
           contentId,
           contentType,
