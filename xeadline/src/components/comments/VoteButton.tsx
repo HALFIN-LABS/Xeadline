@@ -34,6 +34,14 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
     console.log(`VoteButton for ${contentId}: vote=${currentVote}, count=${voteCount}, initial vote=${initialVote}`)
   }, [contentId, currentVote, voteCount, initialVote])
   
+  // Make sure we update if initialVote changes
+  useEffect(() => {
+    console.log(`Initial vote changed for ${contentId}: ${initialVote}`)
+    if (initialVote !== null) {
+      setCurrentVote(initialVote)
+    }
+  }, [contentId, initialVote])
+  
   // Size classes for the buttons and text
   const sizeClasses = {
     sm: {
@@ -120,9 +128,9 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
           disabled={isSubmitting || !currentUser}
           className={`flex items-center justify-center ${sizeClasses[size].button} ${
             currentVote === 'up'
-              ? 'text-bottle-green'
-              : 'text-gray-500 hover:text-bottle-green'
-          } dark:text-gray-400 dark:hover:text-bottle-green transition-colors`}
+              ? 'text-bottle-green dark:text-bottle-green'
+              : 'text-gray-500 hover:text-bottle-green dark:text-gray-400 dark:hover:text-bottle-green'
+          } transition-colors`}
           title="Upvote"
         >
           <svg
@@ -152,9 +160,9 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
           disabled={isSubmitting || !currentUser}
           className={`flex items-center justify-center ${sizeClasses[size].button} ${
             currentVote === 'down'
-              ? 'text-red-500'
-              : 'text-gray-500 hover:text-red-500'
-          } dark:text-gray-400 dark:hover:text-red-500 transition-colors`}
+              ? 'text-red-500 dark:text-red-500'
+              : 'text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-500'
+          } transition-colors`}
           title="Downvote"
         >
           <svg
