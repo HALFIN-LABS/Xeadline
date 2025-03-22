@@ -7,6 +7,7 @@ import profileReducer from './slices/profileSlice'
 import topicReducer from './slices/topicSlice'
 import eventReducer from './slices/eventSlice'
 import postReducer from './slices/postSlice'
+import voteReducer from './slices/voteSlice'
 
 export const rootReducer = combineReducers({
   // Add reducers
@@ -17,4 +18,5 @@ export const rootReducer = combineReducers({
   topic: topicReducer,
   event: eventReducer,
   post: postReducer,
+  vote: voteReducer,
 })

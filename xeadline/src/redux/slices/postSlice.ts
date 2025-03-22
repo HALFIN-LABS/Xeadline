@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from '../store';
 import { Filter } from 'nostr-tools';
 import nostrService from '../../services/nostr/nostrService';
+import { fetchReactionsForContent } from '../../services/nostr/reactionService';
 import { EVENT_TYPES } from '../../constants/eventTypes';
 
 // Define types
@@ -43,7 +44,7 @@ const initialState: PostState = {
 // Fetch posts for a topic
 export const fetchPostsForTopic = createAsyncThunk(
   'post/fetchPostsForTopic',
-  async (topicId: string, { rejectWithValue }) => {
+  async (topicId: string, thunkAPI) => {
     try {
       console.log(`Fetching posts for topic: ${topicId}`);
       
@@ -65,9 +66,9 @@ export const fetchPostsForTopic = createAsyncThunk(
       // Fetch events from Nostr relays
       const events = await nostrService.getEvents(filters);
       console.log(`Found ${events.length} post events for topic ${topicId}`);
-      
       // Process events to create post objects
       const posts: Post[] = [];
+      const postIds: string[] = [];
       
       for (const event of events) {
         try {
@@ -82,20 +83,41 @@ export const fetchPostsForTopic = createAsyncThunk(
               text: contentData.text,
               url: contentData.url,
               media: contentData.media,
-              type: contentData.type || 'text'
+              mediaTypes: contentData.mediaTypes,
+              thumbnails: contentData.thumbnails,
+              type: contentData.type || 'text',
+              linkPreview: contentData.linkPreview
             },
             pubkey: event.pubkey,
             topicId,
             createdAt: event.created_at,
             tags: event.tags,
-            likes: 0, // Placeholder, would need to count actual likes
-            comments: 0 // Placeholder, would need to count actual comments
+            likes: 0, // Will be updated with actual likes
+            comments: 0, // Placeholder, would need to count actual comments
+            userVote: null // Will be updated with user's vote
           };
           
           posts.push(post);
+          postIds.push(event.id);
         } catch (error) {
           console.error(`Error processing post event ${event.id}:`, error);
           // Skip this event and continue with the next one
+        }
+      }
+      
+      // Get the current user's pubkey from the state
+      const state = thunkAPI.getState() as RootState;
+      const currentUserPubkey = state.auth.currentUser?.publicKey;
+      
+      // Fetch reactions for all posts
+      const reactions = await fetchReactionsForContent(postIds, currentUserPubkey);
+      console.log(`Fetched reactions for ${Object.keys(reactions).length} posts`);
+      
+      // Update posts with reaction data
+      for (const post of posts as Post[]) {
+        if (reactions[post.id]) {
+          post.likes = reactions[post.id].likes;
+          post.userVote = reactions[post.id].userVote;
         }
       }
       
@@ -104,7 +126,7 @@ export const fetchPostsForTopic = createAsyncThunk(
       
       return { topicId, posts };
     } catch (error) {
-      return rejectWithValue(error instanceof Error ? error.message : 'Failed to fetch posts');
+      return thunkAPI.rejectWithValue(error instanceof Error ? error.message : 'Failed to fetch posts');
     }
   }
 );
@@ -131,7 +153,7 @@ export const postSlice = createSlice({
         const { topicId, posts } = action.payload;
         
         // Add posts to byId
-        posts.forEach(post => {
+        posts.forEach((post: Post) => {
           state.byId[post.id] = post;
         });
         

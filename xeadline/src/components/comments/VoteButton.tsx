@@ -1,9 +1,10 @@
 'use client'
 
-import React, { useState } from 'react'
-import { useSelector } from 'react-redux'
+import React, { useState, useEffect } from 'react'
+import { useSelector, useDispatch } from 'react-redux'
 import { eventManager } from '../../services/eventManagement'
 import { RootState } from '../../redux/store'
+import { updateVote, selectVoteForContent } from '../../redux/slices/voteSlice'
 
 interface VoteButtonProps {
   contentId: string
@@ -14,7 +15,6 @@ interface VoteButtonProps {
   size?: 'sm' | 'md' | 'lg'
   darkMode?: boolean
 }
-
 export const VoteButton: React.FC<VoteButtonProps> = ({
   contentId,
   contentType,
@@ -24,10 +24,26 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
   size = 'md',
   darkMode = false
 }) => {
-  const [currentVote, setCurrentVote] = useState<'up' | 'down' | null>(initialVote)
-  const [voteCount, setVoteCount] = useState<number>(initialVotes)
+  const dispatch = useDispatch()
+  const { vote: storedVote, count: storedCount } = useSelector((state: RootState) =>
+    selectVoteForContent(state, contentId)
+  )
+  
+  // Use either the stored vote or the initial vote
+  const [currentVote, setCurrentVote] = useState<'up' | 'down' | null>(storedVote || initialVote)
+  const [voteCount, setVoteCount] = useState<number>(storedCount || initialVotes)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const currentUser = useSelector((state: RootState) => state.auth.currentUser)
+  
+  // Update local state when Redux store changes
+  useEffect(() => {
+    if (storedVote !== undefined) {
+      setCurrentVote(storedVote)
+    }
+    if (storedCount !== undefined) {
+      setVoteCount(storedCount)
+    }
+  }, [storedVote, storedCount])
   
   // Size classes for the buttons and text
   const sizeClasses = {
@@ -87,6 +103,14 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
         
         setVoteCount(newCount)
         setCurrentVote(newVote)
+        
+        // Update the Redux store
+        dispatch(updateVote({
+          contentId,
+          contentType,
+          newVote,
+          voteCount: newCount
+        }))
         
         if (onVoteChange) {
           onVoteChange(newVote, newCount)
