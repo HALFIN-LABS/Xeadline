@@ -26,9 +26,13 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
   topicId,
   postId,
   onUpload,
-  darkMode = false,
+  darkMode: propDarkMode = false,
   hideButtons = false
 }) => {
+  // Use the HTML class for dark mode detection, falling back to the prop
+  const darkMode = typeof window !== 'undefined'
+    ? document.documentElement.classList.contains('dark')
+    : propDarkMode;
   // Basic upload state
   const [isUploading, setIsUploading] = useState(false)
   const [uploadingType, setUploadingType] = useState<'image' | 'video' | 'gif' | null>(null)

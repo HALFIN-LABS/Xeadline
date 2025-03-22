@@ -41,6 +41,87 @@ const initialState: PostState = {
   error: null
 };
 
+// Fetch a single post by ID
+export const fetchPostById = createAsyncThunk(
+  'post/fetchPostById',
+  async (postId: string, thunkAPI) => {
+    try {
+      console.log(`Fetching post by ID: ${postId}`);
+      
+      // Create filter to get the specific post
+      const filters: Filter[] = [
+        {
+          ids: [postId],
+          kinds: [
+            EVENT_TYPES.TEXT_POST,   // 33301
+            EVENT_TYPES.MEDIA_POST,  // 33302
+            EVENT_TYPES.LINK_POST,   // 33303
+            EVENT_TYPES.POLL_POST    // 33304
+          ],
+          limit: 1
+        }
+      ];
+      
+      // Fetch the post event from Nostr relays
+      const events = await nostrService.getEvents(filters);
+      console.log(`Found ${events.length} events for post ID ${postId}`);
+      
+      if (events.length === 0) {
+        return thunkAPI.rejectWithValue('Post not found');
+      }
+      
+      const event = events[0];
+      
+      try {
+        // Parse the content
+        const contentData = JSON.parse(event.content);
+        
+        // Create the post object
+        const post: Post = {
+          id: event.id,
+          content: {
+            title: contentData.title || 'Untitled Post',
+            text: contentData.text,
+            url: contentData.url,
+            media: contentData.media,
+            mediaTypes: contentData.mediaTypes,
+            thumbnails: contentData.thumbnails,
+            type: contentData.type || 'text',
+            linkPreview: contentData.linkPreview
+          },
+          pubkey: event.pubkey,
+          topicId: event.tags.find(tag => tag[0] === 't')?.[1] || '',
+          createdAt: event.created_at,
+          tags: event.tags,
+          likes: 0, // Will be updated with actual likes
+          comments: 0, // Placeholder, would need to count actual comments
+          userVote: null // Will be updated with user's vote
+        };
+        
+        // Get the current user's pubkey from the state
+        const state = thunkAPI.getState() as RootState;
+        const currentUserPubkey = state.auth.currentUser?.publicKey;
+        
+        // Fetch reactions for the post
+        const reactions = await fetchReactionsForContent([postId], currentUserPubkey);
+        
+        // Update post with reaction data
+        if (reactions[postId]) {
+          post.likes = reactions[postId].likes;
+          post.userVote = reactions[postId].userVote;
+        }
+        
+        return post;
+      } catch (error) {
+        console.error(`Error processing post event ${event.id}:`, error);
+        return thunkAPI.rejectWithValue('Error processing post data');
+      }
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error instanceof Error ? error.message : 'Failed to fetch post');
+    }
+  }
+);
+
 // Fetch posts for a topic
 export const fetchPostsForTopic = createAsyncThunk(
   'post/fetchPostsForTopic',
@@ -142,6 +223,31 @@ export const postSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // Fetch single post by ID
+      .addCase(fetchPostById.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchPostById.fulfilled, (state, action) => {
+        state.loading = false;
+        
+        const post = action.payload;
+        
+        // Add post to byId
+        state.byId[post.id] = post;
+        
+        // Update byTopic if needed
+        if (post.topicId && !state.byTopic[post.topicId]) {
+          state.byTopic[post.topicId] = [post.id];
+        } else if (post.topicId && !state.byTopic[post.topicId].includes(post.id)) {
+          state.byTopic[post.topicId].push(post.id);
+        }
+      })
+      .addCase(fetchPostById.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      
       // Fetch posts for topic
       .addCase(fetchPostsForTopic.pending, (state) => {
         state.loading = true;

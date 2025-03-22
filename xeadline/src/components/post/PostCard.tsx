@@ -38,32 +38,38 @@ export const PostCard: React.FC<PostCardProps> = ({ post, topicName }) => {
   }, [isLinkPost, isTextPost, post.content, post.content.type]);
   
   return (
-    <div className="rounded-xl hover:bg-gray-50 hover:shadow-md dark:hover:bg-gray-800/80 overflow-hidden flex flex-col md:flex-row transition-all">
+    <Link href={`/post/${post.id}`} className="rounded-xl hover:bg-gray-50 hover:shadow-md dark:hover:bg-gray-800/80 overflow-hidden flex flex-col md:flex-row transition-all">
       {/* Main content area */}
       <div className="flex flex-col md:flex-grow justify-between">
         {/* Post header */}
         <div className="p-3 pb-2">
           <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-1">
-            <Link href={`/topic/${post.topicId}`} className="font-medium text-bottle-green hover:underline mr-1">
+            <Link
+              href={`/topic/${post.topicId}`}
+              className="font-medium text-bottle-green hover:underline mr-1"
+              onClick={(e) => e.stopPropagation()}
+            >
               t/{topicName || post.topicId.split(':')[1] || post.topicId}
             </Link>
             <span className="mx-1">•</span>
-            <Link href={`/profile/${post.pubkey}`} className="text-blue-600 dark:text-blue-400 hover:underline mx-1">
+            <Link
+              href={`/profile/${post.pubkey}`}
+              className="text-blue-600 dark:text-blue-400 hover:underline mx-1"
+              onClick={(e) => e.stopPropagation()}
+            >
               {username}
             </Link>
             <span className="mx-1">•</span>
             <span>{new Date(post.createdAt * 1000).toLocaleString()}</span>
           </div>
-          <h2 className="text-lg font-semibold mb-1">
-            <Link href={`/post/${post.id}`} className="hover:underline">
-              {post.content.title}
-            </Link>
+          <h2 className="text-lg font-semibold mb-1 hover:underline">
+            {post.content.title}
           </h2>
         </div>
         
         {/* Media content - displayed below the title for media posts */}
         {hasMedia && post.content.media && post.content.media.length > 0 && (
-          <div className="px-3 pb-2">
+          <div className="px-3 pb-2" onClick={(e) => e.stopPropagation()}>
             <div className="relative w-full aspect-square bg-gray-100 dark:bg-gray-700 overflow-hidden rounded-md">
               {/* Determine if the media is a video or an image based on URL or mediaTypes */}
               {(post.content.mediaTypes?.[0] === 'video' ||
@@ -74,6 +80,10 @@ export const PostCard: React.FC<PostCardProps> = ({ post, topicName }) => {
                   preload="metadata"
                   className="w-full h-full object-contain"
                   poster={post.content.thumbnails?.[0] || ''}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Allow video controls to work normally
+                  }}
                 >
                   Your browser does not support the video tag.
                 </video>
@@ -112,12 +122,13 @@ export const PostCard: React.FC<PostCardProps> = ({ post, topicName }) => {
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-600 dark:text-blue-400 hover:underline line-clamp-2"
+              onClick={(e) => e.stopPropagation()}
             >
               {post.content.url}
             </a>
             
             {/* Link preview */}
-            <div className="mt-3">
+            <div className="mt-3" onClick={(e) => e.stopPropagation()}>
               {post.content.linkPreview ? (
                 <div className="link-preview-container">
                   <EmbeddedContent
@@ -140,40 +151,62 @@ export const PostCard: React.FC<PostCardProps> = ({ post, topicName }) => {
         {/* Post content preview - only show for text posts */}
         {isTextPost && post.content.text && (
           <div className="px-3 pb-2 flex-grow">
-            <MarkdownContent
-              content={post.content.text}
-              makeLinksClickable={false} // In card view, links are not clickable
-              className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2"
-            />
+            <div onClick={(e) => {
+              // Allow clicking on text to navigate to post detail
+              // but prevent any link clicks from triggering the parent navigation
+              if ((e.target as HTMLElement).tagName === 'A') {
+                e.stopPropagation();
+              }
+            }}>
+              <MarkdownContent
+                content={post.content.text}
+                makeLinksClickable={false} // In card view, links are not clickable
+                className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2"
+              />
+            </div>
           </div>
         )}
         
         {/* Post actions */}
         <div className="px-3 py-2 flex items-center space-x-2 text-gray-500 dark:text-gray-400 text-xs">
-          <VoteButton
-            contentId={post.id}
-            contentType="post"
-            initialVotes={post.likes || 0}
-            initialVote={post.userVote}
-            size="sm"
-            darkMode={typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches}
-          />
+          <div onClick={(e) => e.stopPropagation()}>
+            <VoteButton
+              contentId={post.id}
+              contentType="post"
+              initialVotes={post.likes || 0}
+              initialVote={post.userVote}
+              size="sm"
+              darkMode={typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches}
+            />
+          </div>
           
-          <button className="flex items-center space-x-1 btn-transparent px-2 py-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              window.location.href = `/post/${post.id}`;
+            }}
+            className="flex items-center space-x-1 btn-transparent px-2 py-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
             <span>{post.comments || 0} comments</span>
           </button>
           
-          <button className="flex items-center space-x-1 btn-transparent px-2 py-1 rounded-full hover:bg-gray-200 hover:text-yellow-500 dark:hover:bg-gray-600 dark:hover:text-yellow-500 transition-colors">
+          <button
+            className="flex items-center space-x-1 btn-transparent px-2 py-1 rounded-full hover:bg-gray-200 hover:text-yellow-500 dark:hover:bg-gray-600 dark:hover:text-yellow-500 transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
             <span>Zap</span>
           </button>
           
-          <button className="flex items-center space-x-1 btn-transparent px-2 py-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+          <button
+            className="flex items-center space-x-1 btn-transparent px-2 py-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
             </svg>
@@ -184,10 +217,13 @@ export const PostCard: React.FC<PostCardProps> = ({ post, topicName }) => {
       
       {/* Link preview for text posts with links */}
       {firstUrl && !isLinkPost && !hasMedia && (
-        <div className="md:w-[160px] md:min-w-[160px] md:max-w-[160px] p-2 md:self-end">
+        <div
+          className="md:w-[160px] md:min-w-[160px] md:max-w-[160px] p-2 md:self-end"
+          onClick={(e) => e.stopPropagation()}
+        >
           <LinkPreview url={firstUrl} className="h-full" />
         </div>
       )}
-    </div>
+    </Link>
   )
 }

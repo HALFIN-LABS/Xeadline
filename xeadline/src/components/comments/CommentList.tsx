@@ -10,10 +10,14 @@ interface CommentListProps {
   darkMode?: boolean
 }
 
-export const CommentList: React.FC<CommentListProps> = ({ 
+export const CommentList: React.FC<CommentListProps> = ({
   postId,
-  darkMode = false
+  darkMode: propDarkMode = false
 }) => {
+  // Use the HTML class for dark mode detection, falling back to the prop
+  const darkMode = typeof window !== 'undefined'
+    ? document.documentElement.classList.contains('dark')
+    : propDarkMode;
   const [comments, setComments] = useState<Comment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -26,47 +30,20 @@ export const CommentList: React.FC<CommentListProps> = ({
       setError(null)
       
       try {
-        // This would be replaced with an actual API call
-        // For now, we'll use mock data
-        await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate network delay
+        // Fetch comments from the API with a timestamp to prevent caching
+        const timestamp = Date.now();
+        const response = await fetch(`/api/posts/${postId}/comments?sort=${sortBy}&_=${timestamp}`);
         
-        const mockComments: Comment[] = [
-          {
-            id: '1',
-            pubkey: '3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d',
-            content: {
-              text: 'This is a great post! I really enjoyed reading it.'
-            },
-            createdAt: Date.now() / 1000 - 3600, // 1 hour ago
-            likes: 5,
-            userVote: 'up'
-          },
-          {
-            id: '2',
-            pubkey: '32e1827635450ebb3c5a7d12c1f8e7b2b514439ac10a67eef3d9fd9c5c68e245',
-            content: {
-              text: 'I disagree with some points, but overall it was informative.'
-            },
-            createdAt: Date.now() / 1000 - 7200, // 2 hours ago
-            likes: 2,
-            userVote: null
-          },
-          {
-            id: '3',
-            pubkey: '3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d',
-            content: {
-              text: 'Has anyone tried implementing this approach in a real-world scenario?'
-            },
-            createdAt: Date.now() / 1000 - 10800, // 3 hours ago
-            likes: 3,
-            userVote: null,
-            replyTo: '1'
-          }
-        ]
+        if (!response.ok) {
+          throw new Error(`Failed to fetch comments: ${response.statusText}`);
+        }
         
-        // Sort comments based on the selected sort option
-        const sortedComments = sortComments(mockComments, sortBy)
-        setComments(sortedComments)
+        const data = await response.json();
+        console.log(`Fetched ${data.comments?.length || 0} comments for post ${postId}`);
+        if (data.comments?.length > 0) {
+          console.log('First comment:', JSON.stringify(data.comments[0]));
+        }
+        setComments(data.comments || []);
       } catch (error) {
         console.error('Error fetching comments:', error)
         setError('Failed to load comments. Please try again.')
@@ -103,30 +80,103 @@ export const CommentList: React.FC<CommentListProps> = ({
     const topLevelComments: Comment[] = []
     const commentReplies: Record<string, Comment[]> = {}
     
+    console.log('Organizing comments:', flatComments.length);
+    
     // First pass: identify all top-level comments and create empty arrays for replies
     flatComments.forEach(comment => {
+      console.log(`Comment ${comment.id} replyTo: ${comment.replyTo || 'none'}`);
+      
       if (!comment.replyTo) {
+        console.log(`Adding ${comment.id} as top-level comment`);
         topLevelComments.push(comment)
       } else {
         if (!commentReplies[comment.replyTo]) {
           commentReplies[comment.replyTo] = []
         }
+        console.log(`Adding ${comment.id} as reply to ${comment.replyTo}`);
         commentReplies[comment.replyTo].push(comment)
       }
     })
+    
+    console.log('Top-level comments:', topLevelComments.length);
+    console.log('Comment replies:', Object.keys(commentReplies).length);
     
     return { topLevelComments, commentReplies }
   }
   
   // Handle comment creation
   const handleCommentCreated = () => {
-    // Refetch comments
-    // This would be replaced with an actual API call
-    console.log('Comment created, refetching comments...')
+    // Add a small delay to allow the relays to propagate the new comment
+    console.log('Comment created, waiting 2 seconds before refetching...');
+    
+    // Refetch comments when a new comment is created
+    const fetchComments = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        // Wait for 2 seconds to give relays time to propagate the new comment
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Fetch comments from the API with a timestamp to prevent caching
+        const timestamp = Date.now();
+        const response = await fetch(`/api/posts/${postId}/comments?sort=${sortBy}&_=${timestamp}`);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch comments: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log(`Refetched ${data.comments?.length || 0} comments for post ${postId} after comment creation`);
+        
+        // Log all comments for debugging
+        if (data.comments?.length > 0) {
+          console.log('All comments after creation:');
+          data.comments.forEach((comment: any, index: number) => {
+            console.log(`Comment ${index + 1}:`, JSON.stringify({
+              id: comment.id,
+              replyTo: comment.replyTo || 'none',
+              content: comment.content
+            }));
+          });
+        }
+        
+        setComments(data.comments || []);
+      } catch (error) {
+        console.error('Error fetching comments:', error);
+        setError('Failed to load comments. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchComments();
   }
   
   // Get organized comments
   const { topLevelComments, commentReplies } = organizeComments(comments)
+  
+  // Debug the comment structure
+  console.log('Comment structure:');
+  topLevelComments.forEach(comment => {
+    console.log(`Top-level comment: ${comment.id}`);
+    
+    const replies = commentReplies[comment.id] || [];
+    if (replies.length > 0) {
+      console.log(`  Has ${replies.length} direct replies:`);
+      replies.forEach(reply => {
+        console.log(`  - Reply: ${reply.id}`);
+        
+        const nestedReplies = commentReplies[reply.id] || [];
+        if (nestedReplies.length > 0) {
+          console.log(`    Has ${nestedReplies.length} nested replies:`);
+          nestedReplies.forEach(nestedReply => {
+            console.log(`    - Nested reply: ${nestedReply.id}`);
+          });
+        }
+      });
+    }
+  });
   
   return (
     <div className={`comments-section mt-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
@@ -142,8 +192,8 @@ export const CommentList: React.FC<CommentListProps> = ({
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
             className={`text-sm rounded-md border ${
-              darkMode 
-                ? 'bg-gray-700 border-gray-600 text-white' 
+              darkMode
+                ? 'bg-black border-gray-600 text-white'
                 : 'bg-white border-gray-300 text-gray-700'
             } py-1 px-2`}
           >
@@ -196,6 +246,7 @@ export const CommentList: React.FC<CommentListProps> = ({
               comment={comment}
               postId={postId}
               replies={commentReplies[comment.id] || []}
+              commentReplies={commentReplies}
               onReplyCreated={handleCommentCreated}
               darkMode={darkMode}
             />

@@ -21,8 +21,12 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
   initialVote = null,
   onVoteChange,
   size = 'md',
-  darkMode = false
+  darkMode: propDarkMode = false
 }) => {
+  // Use the HTML class for dark mode detection, falling back to the prop
+  const darkMode = typeof window !== 'undefined'
+    ? document.documentElement.classList.contains('dark')
+    : propDarkMode;
   // Use only the initial vote from Nostr data
   const [currentVote, setCurrentVote] = useState<'up' | 'down' | null>(initialVote)
   const [voteCount, setVoteCount] = useState<number>(initialVotes)

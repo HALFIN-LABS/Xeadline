@@ -6,6 +6,7 @@ import { MarkdownContent } from '../common/MarkdownContent'
 import { CommentForm } from './CommentForm'
 import { VoteButton } from '../comments/VoteButton'
 import { Icon } from '../ui/Icon'
+import { Avatar } from '../ui/Avatar'
 
 export interface Comment {
   id: string
@@ -28,6 +29,7 @@ interface CommentItemProps {
   depth?: number
   maxDepth?: number
   replies?: Comment[]
+  commentReplies?: Record<string, Comment[]>
   onReplyCreated?: () => void
   darkMode?: boolean
 }
@@ -36,14 +38,19 @@ export const CommentItem: React.FC<CommentItemProps> = ({
   comment,
   postId,
   depth = 0,
-  maxDepth = 5,
+  maxDepth = 20, // Increase max depth to allow for deeper nesting
   replies = [],
+  commentReplies = {},
   onReplyCreated,
-  darkMode = false
+  darkMode: propDarkMode = false
 }) => {
-  const { username } = useUserProfileWithCache(comment.pubkey)
+  // Use the HTML class for dark mode detection, falling back to the prop
+  const darkMode = typeof window !== 'undefined'
+    ? document.documentElement.classList.contains('dark')
+    : propDarkMode;
+  const { username, profile } = useUserProfileWithCache(comment.pubkey)
   const [showReplyForm, setShowReplyForm] = useState(false)
-  const [showReplies, setShowReplies] = useState(depth < 2) // Auto-expand first two levels
+  const [showReplies, setShowReplies] = useState(true) // Always show replies by default
   
   // Format timestamp
   const formattedDate = new Date(comment.createdAt * 1000).toLocaleString()
@@ -65,21 +72,27 @@ export const CommentItem: React.FC<CommentItemProps> = ({
   // Calculate left margin for nested comments
   const marginLeft = depth > 0 ? `${Math.min(depth * 16, 64)}px` : '0'
   
-  // Determine if we should show "View more replies" button
-  const hasMoreReplies = depth >= maxDepth && replies.length > 0
+  // We'll always show replies, but we'll log nesting information for debugging
+  if (replies.length > 0) {
+    console.log(`Comment ${comment.id} has ${replies.length} replies at depth ${depth}`);
+  }
   
   return (
     <div 
       className={`comment-item ${darkMode ? 'text-gray-200' : 'text-gray-800'}`} 
       style={{ marginLeft }}
     >
-      <div className={`p-3 rounded-lg mb-2 ${darkMode ? 'bg-gray-800/80' : 'bg-white'} shadow-sm`}>
+      <div className={`p-3 rounded-lg mb-2 ${darkMode ? 'bg-black' : 'bg-white'} shadow-sm`}>
         {/* Comment header */}
         <div className="flex items-center mb-2">
-          {/* User avatar placeholder */}
-          <div className="w-8 h-8 rounded-full bg-bottle-green text-white flex items-center justify-center mr-2">
-            {comment.pubkey.charAt(0)}
-          </div>
+          {/* User avatar */}
+          <Avatar
+            src={profile?.picture}
+            alt={username || comment.pubkey.substring(0, 8)}
+            size="sm"
+            className="mr-2"
+            pubkey={comment.pubkey}
+          />
           
           <div className="flex items-center text-xs">
             <span className={`font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
@@ -189,54 +202,26 @@ export const CommentItem: React.FC<CommentItemProps> = ({
         </div>
       )}
       
-      {/* Replies */}
-      {replies.length > 0 && depth < maxDepth && (
+      {/* Replies - always show them regardless of depth */}
+      {replies.length > 0 && (
         <div className="ml-8">
-          {showReplies ? (
-            <>
-              {replies.map(reply => (
-                <CommentItem
-                  key={reply.id}
-                  comment={reply}
-                  postId={postId}
-                  depth={depth + 1}
-                  maxDepth={maxDepth}
-                  onReplyCreated={onReplyCreated}
-                  darkMode={darkMode}
-                />
-              ))}
-            </>
-          ) : (
-            <button
-              onClick={() => setShowReplies(true)}
-              className={`flex items-center space-x-1 py-1 px-2 text-sm ${
-                darkMode 
-                  ? 'text-blue-400 hover:text-blue-300' 
-                  : 'text-blue-600 hover:text-blue-700'
-              }`}
-            >
-              <Icon name="message-circle" size={14} />
-              <span>Show {replies.length} {replies.length === 1 ? 'reply' : 'replies'}</span>
-            </button>
-          )}
+          {replies.map(reply => (
+            <CommentItem
+              key={reply.id}
+              comment={reply}
+              postId={postId}
+              depth={depth + 1}
+              maxDepth={maxDepth}
+              replies={commentReplies[reply.id] || []}
+              commentReplies={commentReplies}
+              onReplyCreated={onReplyCreated}
+              darkMode={darkMode}
+            />
+          ))}
         </div>
       )}
       
-      {/* "View more replies" button for deeply nested comments */}
-      {hasMoreReplies && (
-        <div className="ml-8 mt-1">
-          <button
-            className={`flex items-center space-x-1 py-1 px-2 text-sm ${
-              darkMode 
-                ? 'text-blue-400 hover:text-blue-300' 
-                : 'text-blue-600 hover:text-blue-700'
-            }`}
-          >
-            <Icon name="message-circle" size={14} />
-            <span>View more replies</span>
-          </button>
-        </div>
-      )}
+      {/* We always show all replies now, no need for a "View more replies" button */}
     </div>
   )
 }

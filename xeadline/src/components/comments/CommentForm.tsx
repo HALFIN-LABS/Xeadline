@@ -1,11 +1,11 @@
 'use client'
 
 import React, { useState } from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from '../../redux/hooks'
 import { eventManager } from '../../services/eventManagement'
 import { RootState } from '../../redux/store'
 import { Button } from '../ui/Button'
-import { TextArea } from '../ui/TextArea'
+import { RichTextEditor } from '../editor/RichTextEditor'
 import { Icon } from '../ui/Icon'
 import { MediaUploader } from '../editor/MediaUploader'
 
@@ -20,8 +20,12 @@ export const CommentForm: React.FC<CommentFormProps> = ({
   postId,
   parentCommentId,
   onCommentCreated,
-  darkMode = false
+  darkMode: propDarkMode = false
 }) => {
+  // Use the HTML class for dark mode detection, falling back to the prop
+  const darkMode = typeof window !== 'undefined'
+    ? document.documentElement.classList.contains('dark')
+    : propDarkMode;
   const [content, setContent] = useState('')
   const [mediaUrls, setMediaUrls] = useState<string[]>([])
   const [mediaTypes, setMediaTypes] = useState<('image' | 'video' | 'gif')[]>([])
@@ -29,7 +33,7 @@ export const CommentForm: React.FC<CommentFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showMediaUploader, setShowMediaUploader] = useState(false)
-  const currentUser = useSelector((state: RootState) => state.auth.currentUser)
+  const currentUser = useAppSelector((state: RootState) => state.auth.currentUser)
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,14 +47,19 @@ export const CommentForm: React.FC<CommentFormProps> = ({
     setError(null)
     
     try {
+      // Generate a unique identifier for the 'd' tag
+      const uniqueId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
+      
       // Prepare tags for the comment event
       const tags = [
-        ['e', postId, 'root', 'reply'] // Reference to the post as the root
-      ]
+        ['e', postId, '', 'root'], // Reference to the post as the root
+        ['d', uniqueId] // Add the 'd' tag required for addressable events
+      ];
       
       // If this is a reply to another comment, add that reference
       if (parentCommentId) {
-        tags.push(['e', parentCommentId, 'reply'])
+        tags.push(['e', parentCommentId, '', 'reply']);
+        console.log(`Adding reply reference to comment ${parentCommentId}`);
       }
       
       // Prepare content with media if present
@@ -59,17 +68,20 @@ export const CommentForm: React.FC<CommentFormProps> = ({
         media: mediaUrls.length > 0 ? mediaUrls : undefined,
         mediaTypes: mediaTypes.length > 0 ? mediaTypes : undefined,
         thumbnails: thumbnails.length > 0 ? thumbnails : undefined
-      })
+      });
+      
+      // Import EVENT_TYPES
+      const { EVENT_TYPES } = await import('../../constants/eventTypes');
       
       // Create comment event using the EventManager
       const event = await eventManager.createEvent(
-        1, // kind 1 = text note
+        EVENT_TYPES.COMMENT, // Use the correct event kind for comments (33305)
         eventContent,
         tags
-      )
+      );
       
       // Sign and publish with proper error handling
-      const result = await eventManager.signAndPublishEvent(event)
+      const result = await eventManager.signAndPublishEvent(event);
       
       if (result.success) {
         // Reset form on success
@@ -83,8 +95,27 @@ export const CommentForm: React.FC<CommentFormProps> = ({
         if (onCommentCreated) {
           onCommentCreated()
         }
+        
+        console.log('Comment published successfully:', result);
       } else {
         setError('Failed to publish comment. Please try again.')
+        console.error('Failed to publish comment:', result);
+      }
+      
+      if (result.success) {
+        // Reset form on success
+        setContent('');
+        setMediaUrls([]);
+        setMediaTypes([]);
+        setThumbnails([]);
+        setShowMediaUploader(false);
+        
+        // Call the onCommentCreated callback if provided
+        if (onCommentCreated) {
+          onCommentCreated();
+        }
+      } else {
+        setError('Failed to publish comment. Please try again.');
       }
     } catch (error) {
       console.error('Error creating comment:', error)
@@ -121,7 +152,7 @@ export const CommentForm: React.FC<CommentFormProps> = ({
   
   if (!currentUser) {
     return (
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-4 mb-4 shadow`}>
+      <div className={`${darkMode ? 'bg-black' : 'bg-white'} rounded-lg p-4 mb-4 shadow`}>
         <p className={`text-center ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
           Sign in to comment on this post
         </p>
@@ -130,7 +161,7 @@ export const CommentForm: React.FC<CommentFormProps> = ({
   }
   
   return (
-    <form onSubmit={handleSubmit} className={`mb-4 ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-4 shadow`}>
+    <form onSubmit={handleSubmit} className={`mb-4 ${darkMode ? 'bg-black' : 'bg-white'} rounded-lg p-4 shadow`}>
       <div className="flex flex-col">
         <div className="flex items-start">
           {/* User avatar placeholder - replace with actual avatar component when available */}
@@ -139,11 +170,11 @@ export const CommentForm: React.FC<CommentFormProps> = ({
           </div>
           
           <div className="flex-1">
-            <TextArea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
+            <RichTextEditor
+              onChange={(text) => setContent(text)}
               placeholder={parentCommentId ? "Write a reply..." : "Write a comment..."}
-              className={`w-full mb-3 min-h-[100px] ${darkMode ? 'bg-gray-700 text-white border-gray-600' : ''}`}
+              initialContent={content}
+              className={`comment-input w-full mb-3 ${darkMode ? 'bg-black text-white border-gray-600' : ''}`}
             />
             
             {/* Media preview */}
@@ -206,7 +237,7 @@ export const CommentForm: React.FC<CommentFormProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowMediaUploader(!showMediaUploader)}
-                  className={`flex items-center space-x-1 ${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'} p-1 rounded-md transition-colors`}
+                  className={`flex items-center space-x-1 ${darkMode ? 'text-gray-300 hover:bg-gray-900' : 'text-gray-600 hover:bg-gray-100'} p-1 rounded-md transition-colors`}
                 >
                   <Icon name="image" size={18} />
                   <span className="text-sm">Media</span>

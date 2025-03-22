@@ -1,7 +1,6 @@
 'use client'
 
 import React from 'react'
-import { parseMarkdown } from '../../utils/markdownUtils'
 
 interface MarkdownContentProps {
   content: string
@@ -9,27 +8,49 @@ interface MarkdownContentProps {
   className?: string
 }
 
-/**
- * Component to render markdown content with configurable options
- * 
- * @param content The markdown content to render
- * @param makeLinksClickable Whether links should be clickable (default: false)
- * @param className Additional CSS classes
- */
 export const MarkdownContent: React.FC<MarkdownContentProps> = ({
   content,
   makeLinksClickable = false,
   className = ''
 }) => {
-  // Parse the markdown content
-  const parsedContent = parseMarkdown(content, { makeLinksClickable });
+  // Function to convert markdown to HTML
+  const renderMarkdown = (text: string): string => {
+    // Replace bold text: **text** -> <strong>text</strong>
+    let html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    
+    // Replace italic text: *text* -> <em>text</em>
+    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>')
+    
+    // Replace links: [text](url) -> <a href="url">text</a>
+    if (makeLinksClickable) {
+      html = html.replace(
+        /\[(.*?)\]\((.*?)\)/g, 
+        '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline">$1</a>'
+      )
+      
+      // Also make plain URLs clickable
+      html = html.replace(
+        /(https?:\/\/[^\s]+)/g,
+        '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline">$1</a>'
+      )
+    } else {
+      // Just style links without making them clickable
+      html = html.replace(
+        /\[(.*?)\]\((.*?)\)/g, 
+        '<span class="text-blue-600 dark:text-blue-400">$1</span>'
+      )
+    }
+    
+    // Replace line breaks with <br>
+    html = html.replace(/\n/g, '<br>')
+    
+    return html
+  }
   
-  // Always use dangerouslySetInnerHTML to render markdown content
-  // This ensures that bold and italic formatting is properly rendered
   return (
-    <div
+    <div 
       className={className}
-      dangerouslySetInnerHTML={{ __html: parsedContent }}
+      dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
     />
-  );
-};
+  )
+}

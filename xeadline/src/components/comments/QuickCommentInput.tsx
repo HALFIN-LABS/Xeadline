@@ -1,11 +1,11 @@
 'use client'
 
 import React, { useState } from 'react'
-import { useSelector } from 'react-redux'
+import { useAppSelector } from '../../redux/hooks'
 import { eventManager } from '../../services/eventManagement'
 import { RootState } from '../../redux/store'
 import { Button } from '../ui/Button'
-import { TextArea } from '../ui/TextArea'
+import { RichTextEditor } from '../editor/RichTextEditor'
 import { Icon } from '../ui/Icon'
 
 interface QuickCommentInputProps {
@@ -17,12 +17,16 @@ interface QuickCommentInputProps {
 export const QuickCommentInput: React.FC<QuickCommentInputProps> = ({
   postId,
   onCommentCreated,
-  darkMode = false
+  darkMode: propDarkMode = false
 }) => {
+  // Use the HTML class for dark mode detection, falling back to the prop
+  const darkMode = typeof window !== 'undefined'
+    ? document.documentElement.classList.contains('dark')
+    : propDarkMode;
   const [content, setContent] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const currentUser = useSelector((state: RootState) => state.auth.currentUser)
+  const currentUser = useAppSelector((state: RootState) => state.auth.currentUser)
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,15 +40,32 @@ export const QuickCommentInput: React.FC<QuickCommentInputProps> = ({
     setError(null)
     
     try {
-      // Create comment event
-      const event = await eventManager.createEvent(
-        1, // kind 1 = text note
-        JSON.stringify({ text: content }),
-        [['e', postId, 'root', 'reply']] // Reference to the post
-      )
+      // Generate a unique identifier for the 'd' tag
+      const uniqueId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
       
-      // Sign and publish
-      const result = await eventManager.signAndPublishEvent(event)
+      // Prepare tags for the comment event
+      const tags = [
+        ['e', postId, '', 'root'], // Reference to the post as the root
+        ['d', uniqueId] // Add the 'd' tag required for addressable events
+      ];
+      
+      // Prepare content with media if present
+      const eventContent = JSON.stringify({
+        text: content
+      });
+      
+      // Import EVENT_TYPES
+      const { EVENT_TYPES } = await import('../../constants/eventTypes');
+      
+      // Create comment event using the EventManager
+      const event = await eventManager.createEvent(
+        EVENT_TYPES.COMMENT, // Use the correct event kind for comments (33305)
+        eventContent,
+        tags
+      );
+      
+      // Sign and publish with proper error handling
+      const result = await eventManager.signAndPublishEvent(event);
       
       if (result.success) {
         // Reset form
@@ -54,8 +75,11 @@ export const QuickCommentInput: React.FC<QuickCommentInputProps> = ({
         if (onCommentCreated) {
           onCommentCreated()
         }
+        
+        console.log('Comment published successfully:', result);
       } else {
         setError('Failed to publish comment. Please try again.')
+        console.error('Failed to publish comment:', result);
       }
     } catch (error) {
       console.error('Error creating comment:', error)
@@ -67,7 +91,7 @@ export const QuickCommentInput: React.FC<QuickCommentInputProps> = ({
   
   if (!currentUser) {
     return (
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-4 shadow`}>
+      <div className={`${darkMode ? 'bg-black' : 'bg-white'} rounded-lg p-4 shadow`}>
         <p className={`text-center ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
           Sign in to comment on this post
         </p>
@@ -76,7 +100,7 @@ export const QuickCommentInput: React.FC<QuickCommentInputProps> = ({
   }
   
   return (
-    <form onSubmit={handleSubmit} className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-4 shadow`}>
+    <form onSubmit={handleSubmit} className={`${darkMode ? 'bg-black' : 'bg-white'} rounded-lg p-4 shadow`}>
       <div className="flex items-start">
         {/* User avatar placeholder */}
         <div className="w-10 h-10 rounded-full bg-bottle-green text-white flex items-center justify-center mr-3">
@@ -84,11 +108,11 @@ export const QuickCommentInput: React.FC<QuickCommentInputProps> = ({
         </div>
         
         <div className="flex-1">
-          <TextArea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
+          <RichTextEditor
+            onChange={(text) => setContent(text)}
             placeholder="Add a comment..."
-            className={`w-full mb-3 min-h-[100px] ${darkMode ? 'bg-gray-700 text-white border-gray-600' : ''}`}
+            initialContent={content}
+            className={`comment-input w-full mb-3 ${darkMode ? 'bg-black text-white border-gray-600' : ''}`}
           />
           
           {error && (
@@ -102,8 +126,8 @@ export const QuickCommentInput: React.FC<QuickCommentInputProps> = ({
               <button
                 type="button"
                 className={`flex items-center space-x-1 ${
-                  darkMode 
-                    ? 'text-gray-300 hover:bg-gray-700' 
+                  darkMode
+                    ? 'text-gray-300 hover:bg-gray-900'
                     : 'text-gray-600 hover:bg-gray-100'
                 } p-1 rounded-md transition-colors`}
                 title="Add media (coming soon)"
