@@ -147,7 +147,7 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
             currentVote === 'up'
               ? 'text-bottle-green'
               : 'text-gray-500 hover:text-bottle-green'
-          } dark:hover:text-bottle-green transition-colors`}
+          } dark:text-gray-400 dark:hover:text-bottle-green transition-colors`}
           title="Upvote"
         >
           <svg
@@ -179,7 +179,7 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
             currentVote === 'down'
               ? 'text-red-500'
               : 'text-gray-500 hover:text-red-500'
-          } dark:hover:text-red-500 transition-colors`}
+          } dark:text-gray-400 dark:hover:text-red-500 transition-colors`}
           title="Downvote"
         >
           <svg

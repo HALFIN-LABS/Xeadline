@@ -76,8 +76,10 @@ export async function fetchReactionsForContent(
       if (currentUserPubkey && event.pubkey === currentUserPubkey) {
         if (isUpvote) {
           reactionsByContent[contentId].userVote = 'up';
+          console.log(`Found user vote for ${contentId}: UP from ${event.pubkey.substring(0, 8)}`);
         } else if (isDownvote) {
           reactionsByContent[contentId].userVote = 'down';
+          console.log(`Found user vote for ${contentId}: DOWN from ${event.pubkey.substring(0, 8)}`);
         }
       }
     } catch (error) {
@@ -94,7 +96,12 @@ export async function fetchReactionsForContent(
       likes: data.upvotes - data.downvotes,
       userVote: data.userVote
     };
+    
+    if (data.userVote) {
+      console.log(`Final user vote for ${contentId}: ${data.userVote}, likes: ${data.upvotes - data.downvotes}`);
+    }
   }
 
+  console.log(`Returning reaction data for ${Object.keys(result).length} content items`);
   return result;
 }
