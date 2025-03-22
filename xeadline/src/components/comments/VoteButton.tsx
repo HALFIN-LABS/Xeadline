@@ -100,74 +100,54 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
   }
   
   return (
-    <div className="vote-buttons flex items-center">
-      <button
-        type="button"
-        onClick={() => handleVote('up')}
-        disabled={isSubmitting || !currentUser}
-        className={`${sizeClasses[size].button} rounded-full ${
-          currentVote === 'up'
-            ? darkMode
-              ? 'text-green-400'
-              : 'text-green-600'
-            : darkMode
-              ? 'text-gray-400 hover:text-gray-200'
-              : 'text-gray-500 hover:text-gray-700'
-        } transition-colors`}
-        title="Upvote"
-      >
-        <svg 
-          xmlns="http://www.w3.org/2000/svg" 
-          className={sizeClasses[size].icon} 
-          fill="none" 
-          viewBox="0 0 24 24" 
-          stroke="currentColor"
+    <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-1">
+        <button
+          type="button"
+          onClick={() => handleVote('up')}
+          disabled={isSubmitting || !currentUser}
+          className={`flex items-center space-x-1 btn-transparent ${sizeClasses[size].button} rounded-full hover:bg-gray-200 ${
+            currentVote === 'up'
+              ? 'text-bottle-green'
+              : 'hover:text-bottle-green'
+          } dark:hover:bg-gray-600 dark:hover:text-bottle-green transition-colors`}
+          title="Upvote"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-        </svg>
-      </button>
-      
-      <span className={`${sizeClasses[size].text} font-medium mx-1 ${
-        currentVote === 'up'
-          ? darkMode
-            ? 'text-green-400'
-            : 'text-green-600'
-          : currentVote === 'down'
-            ? darkMode
-              ? 'text-red-400'
-              : 'text-red-600'
-            : darkMode
-              ? 'text-gray-400'
-              : 'text-gray-600'
-      }`}>
-        {voteCount}
-      </span>
-      
-      <button
-        type="button"
-        onClick={() => handleVote('down')}
-        disabled={isSubmitting || !currentUser}
-        className={`${sizeClasses[size].button} rounded-full ${
-          currentVote === 'down'
-            ? darkMode
-              ? 'text-red-400'
-              : 'text-red-600'
-            : darkMode
-              ? 'text-gray-400 hover:text-gray-200'
-              : 'text-gray-500 hover:text-gray-700'
-        } transition-colors`}
-        title="Downvote"
-      >
-        <svg 
-          xmlns="http://www.w3.org/2000/svg" 
-          className={sizeClasses[size].icon} 
-          fill="none" 
-          viewBox="0 0 24 24" 
-          stroke="currentColor"
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className={sizeClasses[size].icon}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+          </svg>
+          <span className="font-medium">{voteCount}</span>
+        </button>
+        
+        <button
+          type="button"
+          onClick={() => handleVote('down')}
+          disabled={isSubmitting || !currentUser}
+          className={`flex items-center space-x-1 btn-transparent ${sizeClasses[size].button} rounded-full hover:bg-gray-200 ${
+            currentVote === 'down'
+              ? 'text-red-500'
+              : 'hover:text-red-500'
+          } dark:hover:bg-gray-600 dark:hover:text-red-500 transition-colors`}
+          title="Downvote"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className={sizeClasses[size].icon}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+          <span className="font-medium">{currentVote === 'down' ? Math.abs(voteCount) : 0}</span>
+        </button>
+      </div>
     </div>
   )
 }

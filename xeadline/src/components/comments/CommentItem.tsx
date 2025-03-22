@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { useUserProfileWithCache } from '../../hooks/useUserProfileWithCache'
 import { MarkdownContent } from '../common/MarkdownContent'
 import { CommentForm } from './CommentForm'
-import { VoteButton } from './VoteButton'
+import { VoteButton } from '../comments/VoteButton'
 import { Icon } from '../ui/Icon'
 
 export interface Comment {
@@ -73,7 +73,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
       className={`comment-item ${darkMode ? 'text-gray-200' : 'text-gray-800'}`} 
       style={{ marginLeft }}
     >
-      <div className={`p-3 rounded-lg mb-2 ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
+      <div className={`p-3 rounded-lg mb-2 ${darkMode ? 'bg-gray-800/80' : 'bg-white'} shadow-sm`}>
         {/* Comment header */}
         <div className="flex items-center mb-2">
           {/* User avatar placeholder */}
