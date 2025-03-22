@@ -101,7 +101,7 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
   
   return (
     <div className="flex items-center space-x-2">
-      <div className="flex items-center border border-gray-300 dark:border-gray-700 rounded-full overflow-hidden">
+      <div className="flex items-center border border-gray-300 dark:border-gray-700 rounded-full overflow-hidden h-8 px-2">
         <button
           type="button"
           onClick={() => handleVote('up')}
@@ -124,7 +124,7 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
           </svg>
         </button>
         
-        <span className={`${sizeClasses[size].text} font-medium px-1 ${
+        <span className={`${sizeClasses[size].text} font-medium px-2 ${
           currentVote === 'up'
             ? 'text-bottle-green'
             : currentVote === 'down'
