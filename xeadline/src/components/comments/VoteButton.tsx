@@ -1,10 +1,9 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useSelector, useDispatch } from 'react-redux'
+import { useSelector } from 'react-redux'
 import { eventManager } from '../../services/eventManagement'
 import { RootState } from '../../redux/store'
-import { updateVote, selectVoteForContent } from '../../redux/slices/voteSlice'
 
 interface VoteButtonProps {
   contentId: string
@@ -24,31 +23,16 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
   size = 'md',
   darkMode = false
 }) => {
-  const dispatch = useDispatch()
-  const { vote: storedVote, count: storedCount } = useSelector((state: RootState) =>
-    selectVoteForContent(state, contentId)
-  )
-  
-  // Use either the stored vote or the initial vote
-  const [currentVote, setCurrentVote] = useState<'up' | 'down' | null>(storedVote || initialVote)
-  const [voteCount, setVoteCount] = useState<number>(storedCount || initialVotes)
+  // Use only the initial vote from Nostr data
+  const [currentVote, setCurrentVote] = useState<'up' | 'down' | null>(initialVote)
+  const [voteCount, setVoteCount] = useState<number>(initialVotes)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const currentUser = useSelector((state: RootState) => state.auth.currentUser)
   
-  // Update local state when Redux store changes
-  useEffect(() => {
-    if (storedVote !== undefined && storedVote !== null) {
-      setCurrentVote(storedVote)
-    }
-    if (storedCount !== undefined) {
-      setVoteCount(storedCount)
-    }
-  }, [storedVote, storedCount])
-
   // Debug log
   useEffect(() => {
-    console.log(`VoteButton for ${contentId}: vote=${currentVote}, count=${voteCount}, stored vote=${storedVote}, stored count=${storedCount}`)
-  }, [contentId, currentVote, voteCount, storedVote, storedCount])
+    console.log(`VoteButton for ${contentId}: vote=${currentVote}, count=${voteCount}, initial vote=${initialVote}`)
+  }, [contentId, currentVote, voteCount, initialVote])
   
   // Size classes for the buttons and text
   const sizeClasses = {
@@ -115,15 +99,6 @@ export const VoteButton: React.FC<VoteButtonProps> = ({
         
         setVoteCount(newCount)
         setCurrentVote(newVote)
-        
-        // Update the Redux store
-        console.log(`Dispatching updateVote for ${contentId}: ${newVote}, count: ${newCount}`)
-        dispatch(updateVote({
-          contentId,
-          contentType,
-          newVote,
-          voteCount: newCount
-        }))
         
         if (onVoteChange) {
           onVoteChange(newVote, newCount)
