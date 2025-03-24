@@ -23,6 +23,49 @@ const roboto = Roboto({
 export const metadata: Metadata = {
   title: 'Xeadline - Own the internet',
   description: 'A decentralised forum built on Nostr and the Lightning Network',
+  icons: {
+    icon: '/xeadline-icon.svg',
+    apple: '/xeadline-icon.svg',
+  },
+  openGraph: {
+    title: 'Xeadline - Own the internet',
+    description: 'A decentralised forum built on Nostr and the Lightning Network',
+    url: 'https://xeadline.com',
+    siteName: 'Xeadline',
+    images: [
+      {
+        url: '/xeadline-icon.svg',
+        width: 800,
+        height: 600,
+        alt: 'Xeadline Logo',
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Xeadline - Own the internet',
+    description: 'A decentralised forum built on Nostr and the Lightning Network',
+    images: ['/xeadline-icon.svg'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  verification: {
+    google: 'verification_token', // Replace with actual Google verification token when available
+  },
+  alternates: {
+    canonical: 'https://xeadline.com',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
