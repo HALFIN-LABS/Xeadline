@@ -8,6 +8,7 @@ import topicReducer from './slices/topicSlice'
 import eventReducer from './slices/eventSlice'
 import postReducer from './slices/postSlice'
 import voteReducer from './slices/voteSlice'
+import flagReducer from './slices/flagSlice'
 
 export const rootReducer = combineReducers({
   // Add reducers
@@ -19,4 +20,5 @@ export const rootReducer = combineReducers({
   event: eventReducer,
   post: postReducer,
   vote: voteReducer,
+  flag: flagReducer,
 })
