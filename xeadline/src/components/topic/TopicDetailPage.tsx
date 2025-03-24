@@ -420,7 +420,7 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
                 {/* Moderator Dashboard Link - Only visible to moderators */}
                 {currentUser && topic.moderators.includes(currentUser.publicKey) && (
                   <Link
-                    href={`/t/${topic.slug}/moderate`}
+                    href={`/t/${topic.id}/moderate`}
                     className="flex items-center text-sm text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
