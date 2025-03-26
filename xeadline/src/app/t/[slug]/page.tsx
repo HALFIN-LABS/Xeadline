@@ -7,7 +7,7 @@ import { getTopicIdFromSlug } from '../../../services/topicSlugService';
 
 export default function TopicPage() {
   const params = useParams();
-  const slug = params?.id as string || '';
+  const slug = params?.slug as string || '';
   const [topicId, setTopicId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

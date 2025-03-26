@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '../../../../redux/hooks';
 import { fetchTopic, selectCurrentTopic, selectTopicLoading } from '../../../../redux/slices/topicSlice';
 import ModeratorDashboard from '../../../../components/moderation/ModeratorDashboard';
+import { getTopicIdFromSlug } from '../../../../services/topicSlugService';
 
 export default function ModeratorDashboardPage() {
   const params = useParams();
@@ -12,12 +13,29 @@ export default function ModeratorDashboardPage() {
   const dispatch = useAppDispatch();
   const currentTopic = useAppSelector(selectCurrentTopic);
   const isLoading = useAppSelector(selectTopicLoading);
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
-    if (slug) {
-      // First try to fetch by slug
-      dispatch(fetchTopic(slug));
+    async function fetchTopicData() {
+      if (!slug) return;
+      
+      try {
+        // First try to get the topic ID from the slug
+        const topicId = await getTopicIdFromSlug(slug);
+        
+        if (topicId) {
+          // Then fetch the topic using the ID
+          dispatch(fetchTopic(topicId));
+        } else {
+          setError('Topic not found');
+        }
+      } catch (err) {
+        console.error('Error fetching topic:', err);
+        setError('Error loading topic');
+      }
     }
+    
+    fetchTopicData();
   }, [dispatch, slug]);
   
   if (isLoading) {
@@ -28,11 +46,11 @@ export default function ModeratorDashboardPage() {
     );
   }
   
-  if (!currentTopic) {
+  if (error || !currentTopic) {
     return (
       <div className="container mx-auto px-4 py-6">
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-6 my-4 text-center">
-          <p className="text-red-700 dark:text-red-300">Topic not found.</p>
+          <p className="text-red-700 dark:text-red-300">{error || 'Topic not found.'}</p>
         </div>
       </div>
     );
