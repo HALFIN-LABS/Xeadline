@@ -14,6 +14,7 @@ export interface AuthState {
   isLoading: boolean;
   error: string | null;
   keyJustGenerated: boolean; // Track if a key was just generated
+  isInitialized: boolean; // Track if auth initialization is complete
 }
 
 const initialState: AuthState = {
@@ -23,6 +24,7 @@ const initialState: AuthState = {
   isLoading: false,
   error: null,
   keyJustGenerated: false,
+  isInitialized: false,
 };
 
 export const authSlice = createSlice({
@@ -59,6 +61,9 @@ export const authSlice = createSlice({
     setKeyJustGenerated: (state, action: PayloadAction<boolean>) => {
       state.keyJustGenerated = action.payload;
     },
+    setAuthInitialized: (state, action: PayloadAction<boolean>) => {
+      state.isInitialized = action.payload;
+    },
   },
 });
 
@@ -70,6 +75,7 @@ export const {
   setExtensionAvailable,
   clearError,
   setKeyJustGenerated,
+  setAuthInitialized,
 } = authSlice.actions;
 
 // Selectors
@@ -80,5 +86,6 @@ export const selectIsExtensionAvailable = (state: RootState) => state.auth.isExt
 export const selectAuthLoading = (state: RootState) => state.auth.isLoading;
 export const selectAuthError = (state: RootState) => state.auth.error;
 export const selectKeyJustGenerated = (state: RootState) => state.auth.keyJustGenerated;
+export const selectIsAuthInitialized = (state: RootState) => state.auth.isInitialized;
 
 export default authSlice.reducer;

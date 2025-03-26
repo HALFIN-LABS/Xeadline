@@ -1,25 +1,35 @@
 import { useEffect } from 'react';
-import { useAppDispatch } from '../redux/hooks';
+import { useAppDispatch, useAppSelector } from '../redux/hooks';
 import { updateConnectionStatus, setInitialized, connectToRelays } from '../redux/slices/nostrSlice';
+import { selectIsAuthenticated } from '../redux/slices/authSlice';
 import nostrService from '../services/nostr/nostrService';
 
 /**
  * Hook to initialize Nostr connection and listen for state changes
- * Automatically connects to relays on mount
+ * Only connects to relays when user is authenticated
  */
 export const useNostrConnection = () => {
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const currentUserPublicKey = useAppSelector(state => state.auth.currentUser?.publicKey);
 
   useEffect(() => {
+    // Mark as initialized regardless of authentication status
+    dispatch(setInitialized(true));
+    
+    // Only proceed with connection if user is authenticated
+    if (!isAuthenticated || !currentUserPublicKey) {
+      console.log('NostrConnection: User not authenticated, skipping connection');
+      return;
+    }
+    
+    console.log('NostrConnection: User authenticated, establishing connection');
     let unsubscribe = () => {};
     
     // Set up listener for Nostr service state changes
     unsubscribe = nostrService.addStateListener((state) => {
       dispatch(updateConnectionStatus(state));
     });
-
-    // Mark as initialized
-    dispatch(setInitialized(true));
     
     // Automatically connect to relays with retry logic
     const connectWithRetry = async (retries = 3, delay = 5000) => {
@@ -43,7 +53,7 @@ export const useNostrConnection = () => {
     return () => {
       unsubscribe();
     };
-  }, [dispatch]);
+  }, [dispatch, isAuthenticated, currentUserPublicKey]);
 };
 
 export default useNostrConnection;

@@ -11,6 +11,8 @@ interface RelayStatusModalProps {
   onDisconnect?: () => void;
   onReconnect?: () => void;
   status?: ConnectionStatus;
+  isAuthenticated?: boolean;
+  isAuthInitialized?: boolean;
 }
 
 const RelayStatusModal: React.FC<RelayStatusModalProps> = ({
@@ -19,7 +21,9 @@ const RelayStatusModal: React.FC<RelayStatusModalProps> = ({
   relayUrls,
   onDisconnect,
   onReconnect,
-  status = 'disconnected'
+  status = 'disconnected',
+  isAuthenticated = false,
+  isAuthInitialized = false
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const { connectedRelays } = useAppSelector((state) => state.nostr);
@@ -81,65 +85,81 @@ const RelayStatusModal: React.FC<RelayStatusModalProps> = ({
           </button>
         </div>
         
-        <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-          {safeRelayUrls.length > 0 ? (
-            safeRelayUrls.map((url) => {
-              const isConnected = connectedRelays.includes(url);
-              const isPrimary = url === safeRelayUrls[0];
-              
-              return (
-                <div
-                  key={url}
-                  className={`p-3 rounded-lg ${isPrimary ? 'border border-bottle-green' : 'border border-gray-700'}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium truncate max-w-[200px]">{url}</span>
-                        {isPrimary && (
-                          <span className="text-xs text-bottle-green">Primary Relay</span>
-                        )}
+        {!isAuthInitialized && (
+          <div className="text-center py-4 mb-4 bg-gray-700 rounded-lg">
+            <p className="text-gray-300">Authentication is initializing...</p>
+          </div>
+        )}
+        
+        {isAuthInitialized && !isAuthenticated && (
+          <div className="text-center py-4 mb-4 bg-gray-700 rounded-lg">
+            <p className="text-gray-300">You are not signed in. Sign in to connect to Nostr relays.</p>
+          </div>
+        )}
+        
+        {isAuthenticated && (
+          <>
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+              {safeRelayUrls.length > 0 ? (
+                safeRelayUrls.map((url) => {
+                  const isConnected = connectedRelays.includes(url);
+                  const isPrimary = url === safeRelayUrls[0];
+                  
+                  return (
+                    <div
+                      key={url}
+                      className={`p-3 rounded-lg ${isPrimary ? 'border border-bottle-green' : 'border border-gray-700'}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium truncate max-w-[200px]">{url}</span>
+                            {isPrimary && (
+                              <span className="text-xs text-bottle-green">Primary Relay</span>
+                            )}
+                          </div>
+                        </div>
+                        <span className={`text-xs font-medium ${isConnected ? 'text-green-500' : 'text-red-500'}`}>
+                          {isConnected ? 'Connected' : 'Disconnected'}
+                        </span>
                       </div>
                     </div>
-                    <span className={`text-xs font-medium ${isConnected ? 'text-green-500' : 'text-red-500'}`}>
-                      {isConnected ? 'Connected' : 'Disconnected'}
-                    </span>
-                  </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-4 text-gray-400">
+                  No relays configured
                 </div>
-              );
-            })
-          ) : (
-            <div className="text-center py-4 text-gray-400">
-              No relays configured
+              )}
             </div>
-          )}
-        </div>
-        
-        <div className="mt-4 text-center text-sm text-gray-400">
-          {connectedRelays.length} of {safeRelayUrls.length} relays connected
-        </div>
-        
-        {/* Connection control buttons */}
-        <div className="mt-4 flex justify-center space-x-4">
-          {status === 'connected' && onDisconnect && (
-            <button
-              onClick={onDisconnect}
-              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-            >
-              Disconnect
-            </button>
-          )}
-          
-          {(status === 'disconnected' || status === 'error') && onReconnect && (
-            <button
-              onClick={onReconnect}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-            >
-              Reconnect
-            </button>
-          )}
-        </div>
+            
+            <div className="mt-4 text-center text-sm text-gray-400">
+              {connectedRelays.length} of {safeRelayUrls.length} relays connected
+            </div>
+            
+            {/* Connection control buttons */}
+            <div className="mt-4 flex justify-center space-x-4">
+              {status === 'connected' && onDisconnect && (
+                <button
+                  onClick={onDisconnect}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                >
+                  Disconnect
+                </button>
+              )}
+              
+              {(status === 'disconnected' || status === 'error') && onReconnect && (
+                <button
+                  onClick={onReconnect}
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                >
+                  Reconnect
+                </button>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

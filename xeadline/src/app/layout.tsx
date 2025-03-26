@@ -80,13 +80,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ErrorBoundary>
             <PasswordModalProvider>
               <BrowserCheck>
-                {/* Phase 2: Re-enabled NostrInitializer with feature flags and phased initialization */}
-                <NostrInitializer />
+                {/* Initialize auth first, then Nostr connection */}
                 <AuthInitializer />
+                {/* NostrInitializer now depends on auth state */}
+                <NostrInitializer />
                 <MainLayout>
                   {children}
                 </MainLayout>
-                {/* Phase 1: Re-enabled ConnectionStatus with error handling */}
+                {/* Connection status indicator */}
                 <ConnectionStatus />
               </BrowserCheck>
             </PasswordModalProvider>

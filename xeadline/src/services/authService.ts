@@ -39,54 +39,78 @@ const useLocalStorage = true;
 /**
  * Initializes the authentication state
  * Checks for existing session and extension availability
- * 
+ *
  * @param dispatch - Redux dispatch function
+ * @returns Promise that resolves when initialization is complete
  */
-export async function initializeAuth(dispatch: AppDispatch) {
-  // Check for Nostr extension
-  const hasExtension = await checkExtensionAvailability();
-  dispatch(setExtensionAvailable(hasExtension));
+export async function initializeAuth(dispatch: AppDispatch): Promise<void> {
+  console.log('AuthService: Starting authentication initialization');
   
-  // Check for existing session
-  const session = useLocalStorage
-    ? localStorage.getItem(SESSION_KEY)
-    : sessionStorage.getItem(SESSION_KEY);
-  if (session) {
-    try {
-      const sessionData = JSON.parse(session);
-      
-      // If using extension
-      if (sessionData.useExtension) {
-        if (hasExtension) {
-          const publicKey = await getExtensionPublicKey();
-          if (publicKey) {
-            dispatch(loginSuccess({ publicKey }));
+  try {
+    // Check for Nostr extension
+    const hasExtension = await checkExtensionAvailability();
+    dispatch(setExtensionAvailable(hasExtension));
+    console.log('AuthService: Extension availability checked:', hasExtension);
+    
+    // Check for existing session
+    const session = useLocalStorage
+      ? localStorage.getItem(SESSION_KEY)
+      : sessionStorage.getItem(SESSION_KEY);
+    
+    if (session) {
+      console.log('AuthService: Found existing session');
+      try {
+        const sessionData = JSON.parse(session);
+        
+        // If using extension
+        if (sessionData.useExtension) {
+          console.log('AuthService: Session uses extension');
+          if (hasExtension) {
+            try {
+              const publicKey = await getExtensionPublicKey();
+              if (publicKey) {
+                console.log('AuthService: Successfully retrieved public key from extension');
+                dispatch(loginSuccess({ publicKey }));
+              } else {
+                console.log('AuthService: Extension no longer has the key');
+                clearSession();
+              }
+            } catch (extensionError) {
+              console.error('AuthService: Error getting public key from extension:', extensionError);
+              clearSession();
+            }
           } else {
-            // Extension no longer has the key
+            console.log('AuthService: Extension no longer available');
             clearSession();
           }
-        } else {
-          // Extension no longer available
-          clearSession();
         }
-      } 
-      // If using stored key
-      else if (sessionData.hasStoredKey) {
-        const publicKey = retrievePublicKey();
-        if (publicKey) {
-          dispatch(loginSuccess({ 
-            publicKey,
-            encryptedPrivateKey: localStorage.getItem('xeadline_encrypted_private_key') || undefined
-          }));
-        } else {
-          // Stored key no longer available
-          clearSession();
+        // If using stored key
+        else if (sessionData.hasStoredKey) {
+          console.log('AuthService: Session uses stored key');
+          const publicKey = retrievePublicKey();
+          if (publicKey) {
+            console.log('AuthService: Successfully retrieved stored public key');
+            dispatch(loginSuccess({
+              publicKey,
+              encryptedPrivateKey: localStorage.getItem('xeadline_encrypted_private_key') || undefined
+            }));
+          } else {
+            console.log('AuthService: Stored key no longer available');
+            clearSession();
+          }
         }
+      } catch (error) {
+        console.error('AuthService: Invalid session data:', error);
+        clearSession();
       }
-    } catch (error) {
-      // Invalid session data
-      clearSession();
+    } else {
+      console.log('AuthService: No existing session found');
     }
+    
+    console.log('AuthService: Authentication initialization completed');
+  } catch (error) {
+    console.error('AuthService: Unexpected error during auth initialization:', error);
+    // Even on error, we consider initialization complete
   }
 }
 
