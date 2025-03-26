@@ -15,7 +15,7 @@ export default function SafariNotice() {
           </div>
           <h1 className="text-2xl font-bold mb-2">Browser Not Supported</h1>
           <p className="text-gray-300 mb-6">
-            Xeadline is not currently supported on Safari.
+            Xeadspace is not currently supported on Safari.
           </p>
           <p className="text-gray-300 mb-6">
             Please use one of these browsers instead:

@@ -1,6 +1,7 @@
 import { Event, Filter, SimplePool } from 'nostr-tools';
 
 // Define default relays
+// Note: relay.xeadline.com is kept for backward compatibility
 const DEFAULT_RELAYS = [
   'wss://relay.xeadline.com',
   'wss://relay.damus.io',

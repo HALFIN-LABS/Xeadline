@@ -34,11 +34,11 @@ export default function RightSidebar() {
           </div>
         </div>
 
-        {/* About Xeadline */}
+        {/* About Xeadspace */}
         <div className="mb-6 bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-          <h2 className="text-lg font-semibold mb-2">About Xeadline</h2>
+          <h2 className="text-lg font-semibold mb-2">About Xeadspace</h2>
           <p className="text-sm mb-3">
-            Xeadline is a decentralized news and discussion platform built on Nostr and Lightning Network.
+            Xeadspace is a decentralized news and discussion platform built on Nostr and Lightning Network.
           </p>
           <p className="text-sm">
             Sign up to join the conversation and connect with others in the community.

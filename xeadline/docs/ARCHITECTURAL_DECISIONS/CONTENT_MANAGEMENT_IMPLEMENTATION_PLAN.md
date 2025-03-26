@@ -100,7 +100,7 @@ Implement a comprehensive comment system for posts with voting functionality.
 Implement a comprehensive post detail page layout that follows Reddit-like UI patterns.
 
 **Tasks**:
-1. Create a post detail layout with main content and sidebar
+1. Create a post detail layout with main content and sidebar (this is the page that opens when a post is clicked on)
 2. Implement post action bar with voting, comment count, zap, and share buttons
 3. Add quick comment input directly below the post
 4. Implement comment sorting with "Most liked" as default option

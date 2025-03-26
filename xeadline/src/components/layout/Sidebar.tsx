@@ -34,8 +34,8 @@ export default function Sidebar() {
             <SidebarLink href="/t/news" icon={<NewsIcon />} active={pathname === '/t/news'}>
               News
             </SidebarLink>
-            <SidebarLink href="/t/xeadline" icon={<XeadlineIcon />} active={pathname === '/t/xeadline'}>
-              Xeadline
+            <SidebarLink href="/t/xeadspace" icon={<XeadspaceIcon />} active={pathname === '/t/xeadspace'}>
+              Xeadspace
             </SidebarLink>
             <SidebarLink href="/t/technology" icon={<DeviceIcon />} active={pathname === '/t/technology'}>
               Technology
@@ -66,7 +66,7 @@ export default function Sidebar() {
 
         <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
           <div className="text-xs text-gray-500 dark:text-gray-400">
-            <p className="mb-2">© 2025 Xeadline</p>
+            <p className="mb-2">© 2025 Xeadspace</p>
             <div className="flex flex-wrap gap-x-2 gap-y-1 mb-2">
               <Link href="/help" className="hover:underline">Help</Link>
               <Link href="/about" className="hover:underline">About</Link>
@@ -201,11 +201,11 @@ function HelpIcon() {
   );
 }
 
-function XeadlineIcon() {
+function XeadspaceIcon() {
   return (
     <img
-      src="/xeadline-icon.svg"
-      alt="Xeadline"
+      src="/xeadspace-icon.svg"
+      alt="Xeadspace"
       className="h-5 w-5"
       style={{ filter: 'brightness(0) invert(var(--sidebar-icon-invert, 0))' }}
     />

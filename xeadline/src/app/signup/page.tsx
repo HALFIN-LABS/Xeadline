@@ -66,7 +66,7 @@ export default function SignupPage() {
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-            Create your Xeadline account
+            Create your Xeadspace account
           </h2>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Or{' '}
@@ -88,7 +88,7 @@ export default function SignupPage() {
           <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">About Nostr Keys</h3>
           <div className="mt-2 text-sm text-blue-700 dark:text-blue-400">
             <p>
-              Xeadline uses Nostr keys for authentication. We'll generate a secure key pair for you.
+              Xeadspace uses Nostr keys for authentication. We'll generate a secure key pair for you.
             </p>
             <p className="mt-1">
               Your private key will be encrypted with your password and stored locally. We never have access to your private key.

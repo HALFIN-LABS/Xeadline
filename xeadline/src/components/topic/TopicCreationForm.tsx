@@ -213,7 +213,7 @@ export default function TopicCreationForm({ onSuccess, onCancel }: TopicCreation
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-bottle-green focus:border-bottle-green dark:bg-gray-700 dark:text-white"
-            placeholder="e.g., Xeadline News"
+            placeholder="e.g., Xeadspace News"
             required
           />
         </div>

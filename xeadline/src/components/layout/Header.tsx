@@ -57,13 +57,13 @@ export default function Header() {
         <Link href="/" className="flex items-center px-4">
           <div className="h-8 w-8 relative mr-2 flex-shrink-0 bg-bottle-green rounded-full flex items-center justify-center">
             <img
-              src="/xeadline-icon.svg"
-              alt="Xeadline"
+              src="/xeadspace-icon.svg"
+              alt="Xeadspace"
               className="h-5 w-5"
               style={{ filter: 'brightness(0) invert(1)' }}
             />
           </div>
-          <span className="text-xl font-bold text-white hidden sm:block" style={{ fontFamily: 'var(--font-roboto)' }}>Xeadline</span>
+          <span className="text-xl font-bold text-white hidden sm:block" style={{ fontFamily: 'var(--font-roboto)' }}>Xeadspace</span>
         </Link>
 
         {/* Mobile menu button */}
@@ -87,7 +87,7 @@ export default function Header() {
           <div className={`w-full max-w-xl relative rounded-full ${isSearchFocused ? 'ring-2 ring-bottle-green' : ''}`}>
             <input
               type="text"
-              placeholder="Search Xeadline"
+              placeholder="Search Xeadspace"
               className="w-full py-2 px-4 bg-gray-100 dark:bg-gray-800 rounded-full focus:outline-none"
               onFocus={() => setIsSearchFocused(true)}
               onBlur={() => setIsSearchFocused(false)}

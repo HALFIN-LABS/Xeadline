@@ -56,7 +56,7 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
       if (profile.nip05) {
         const parts = profile.nip05.split('@');
         if (parts.length === 2) {
-          if (parts[1] === 'xeadline.com') {
+          if (parts[1] === 'xead.space') {
             setUseExternalNip05(false);
           } else {
             setUseExternalNip05(true);
@@ -121,13 +121,13 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
   React.useEffect(() => {
     if (nip05) {
       const parts = nip05.split('@');
-      if (parts.length === 2 && parts[1] === 'xeadline.com') {
+      if (parts.length === 2 && parts[1] === 'xead.space') {
         setUsername(parts[0]);
-        // If it's a Xeadline username, it's already verified
+        // If it's a Xeadspace username, it's already verified
         setUsernameAvailable(true);
         setUsernameError('');
       } else {
-        // Reset username if nip05 is not a Xeadline username
+        // Reset username if nip05 is not a Xeadspace username
         setUsername('');
         setUsernameAvailable(false);
         setUsernameError('');
@@ -186,8 +186,8 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
       // User has their own NIP-05 identifier, use it directly
       finalNip05 = nip05;
       
-      // If they previously had a Xeadline username, we need to remove it from the wellknown list
-      if (profile?.nip05 && profile.nip05.endsWith('@xeadline.com')) {
+      // If they previously had a Xeadspace username, we need to remove it from the wellknown list
+      if (profile?.nip05 && profile.nip05.endsWith('@xead.space')) {
         try {
           const oldUsername = profile.nip05.split('@')[0];
           
@@ -210,7 +210,7 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
         }
       }
     } else {
-      // User wants to use Xeadline NIP-05
+      // User wants to use Xeadspace NIP-05
       if (username && usernameAvailable) {
         try {
           const response = await fetch('/api/nip05/claim', {
@@ -231,7 +231,7 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
           }
           
           // Update NIP-05 with the claimed username
-          finalNip05 = `${username}@xeadline.com`;
+          finalNip05 = `${username}@xead.space`;
         } catch (error) {
           console.error('Error claiming username:', error);
           // Continue with profile update even if username claim fails
@@ -433,11 +433,11 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
                   placeholder="username"
                 />
                 <span className="flex items-center">
-                  @xeadline.com
+                  @xead.space
                   {username && !usernameChecking && (
                     <>
                       {/* Username is already allocated to this user */}
-                      {profile?.nip05 === `${username}@xeadline.com` && (
+                      {profile?.nip05 === `${username}@xead.space` && (
                         <span className="ml-2 text-blue-500" title="This username is already allocated to your profile">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -445,7 +445,7 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
                         </span>
                       )}
                       {/* Username is available */}
-                      {usernameAvailable && profile?.nip05 !== `${username}@xeadline.com` && (
+                      {usernameAvailable && profile?.nip05 !== `${username}@xead.space` && (
                         <span className="ml-2 text-green-500" title="Username available">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -453,7 +453,7 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
                         </span>
                       )}
                       {/* Username is not available */}
-                      {!usernameAvailable && profile?.nip05 !== `${username}@xeadline.com` && (
+                      {!usernameAvailable && profile?.nip05 !== `${username}@xead.space` && (
                         <span className="ml-2 text-red-500" title={usernameError || "Username unavailable"}>
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />

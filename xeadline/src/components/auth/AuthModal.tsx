@@ -197,7 +197,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = AuthMode.LOGI
       onClick={handleClose}
       className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-bottle-green hover:bg-bottle-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-bottle-green"
     >
-      Continue to Xeadline
+      Continue to Xeadspace
     </button>
   );
 
@@ -205,7 +205,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = AuthMode.LOGI
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={mode === AuthMode.LOGIN ? 'Sign in to Xeadline' : 'Create your Xeadline account'}
+      title={mode === AuthMode.LOGIN ? 'Sign in to Xeadspace' : 'Create your Xeadspace account'}
       footer={mode === AuthMode.LOGIN ? loginFooter : (keyJustGenerated ? keyBackupFooter : signupFooter)}
     >
       {/* Error messages */}
@@ -495,7 +495,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = AuthMode.LOGI
             {loginMethod === LoginMethod.EXTENSION && (
               <div className="space-y-4">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Login using your Nostr extension (nos2x, Alby, etc.). This is the most secure way to use Xeadline.
+                  Login using your Nostr extension (nos2x, Alby, etc.). This is the most secure way to use Xeadspace.
                 </p>
               </div>
             )}
@@ -526,7 +526,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = AuthMode.LOGI
                 <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">About Nostr Keys</h3>
                 <div className="mt-1 text-sm text-blue-700 dark:text-blue-400">
                   <p>
-                    Xeadline uses Nostr keys for authentication. We'll generate a secure key pair for you.
+                    Xeadspace uses Nostr keys for authentication. We'll generate a secure key pair for you.
                   </p>
                   <p className="mt-1">
                     Your private key will be encrypted with your password and stored locally. We never have access to your private key.

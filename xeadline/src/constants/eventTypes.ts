@@ -1,9 +1,9 @@
 /**
- * Custom event types for Xeadline
- * 
+ * Custom event types for Xeadspace
+ *
  * These event types are in the 33xxx range as recommended by NIP-33 for application-specific events.
  * Events in this range require a 'd' tag to make them addressable.
- * 
+ *
  * Reference: https://github.com/nostr-protocol/nips/blob/master/33.md
  */
 

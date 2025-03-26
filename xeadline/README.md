@@ -1,10 +1,10 @@
-# Xeadline
+# Xeadspace
 
 A decentralized Reddit alternative built on Nostr and Lightning Network.
 
 ## Overview
 
-Xeadline combines the community-focused design of Reddit with the censorship-resistance of Nostr and the economic capabilities of Bitcoin's Lightning Network. It provides a platform where users truly own their content, communities can establish their own governance, and creators can receive direct support through Lightning tips.
+Xeadspace combines the community-focused design of Reddit with the censorship-resistance of Nostr and the economic capabilities of Bitcoin's Lightning Network. It provides a platform where users truly own their content, communities can establish their own governance, and creators can receive direct support through Lightning tips.
 
 ## Tech Stack
 
@@ -26,8 +26,8 @@ Xeadline combines the community-focused design of Reddit with the censorship-res
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/your-organization/xeadline.git
-cd xeadline
+git clone https://github.com/your-organization/xeadspace.git
+cd xeadspace
 ```
 
 2. Install dependencies:
@@ -51,7 +51,7 @@ yarn dev
 ## Project Structure
 
 ```
-xeadline/
+xeadspace/
 ├── src/
 │   ├── app/               # Next.js app router pages
 │   ├── components/        # React components

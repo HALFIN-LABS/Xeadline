@@ -79,7 +79,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-            Sign in to Xeadline
+            Sign in to Xeadspace
           </h2>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Or{' '}
@@ -148,7 +148,7 @@ export default function LoginPage() {
           {loginMethod === LoginMethod.EXTENSION && (
             <div className="space-y-4">
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Login using your Nostr extension (nos2x, Alby, etc.). This is the most secure way to use Xeadline.
+                Login using your Nostr extension (nos2x, Alby, etc.). This is the most secure way to use Xeadspace.
               </p>
               <div className="flex items-center justify-center">
                 <button

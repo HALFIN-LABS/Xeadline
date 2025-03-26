@@ -31,7 +31,7 @@ export const EVENT_TYPES = {
   REACTION: 7,
   BADGE_AWARD: 8,
   
-  // Xeadline-specific event kinds
+  // Xeadspace-specific event kinds
   TOPIC_DEFINITION: 34550,  // NIP-72 topic definition
   TOPIC_APPROVAL: 4550,     // NIP-72 approval event
   TOPIC_POST: 1,            // Regular post in a topic (uses standard kind 1 with topic tag)
@@ -54,6 +54,7 @@ export const EVENT_TYPES = {
 };
 
 // Default relays (copied from nostrService.ts)
+// Note: relay.xeadline.com is kept for backward compatibility
 export const DEFAULT_RELAYS = [
   'wss://relay.xeadline.com',
   'wss://relay.damus.io',

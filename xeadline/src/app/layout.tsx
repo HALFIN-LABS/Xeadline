@@ -21,23 +21,23 @@ const roboto = Roboto({
 })
 
 export const metadata: Metadata = {
-  title: 'Xeadline - Own the internet',
+  title: 'Xeadspace - Own the internet',
   description: 'A decentralised forum built on Nostr and the Lightning Network',
   icons: {
-    icon: '/xeadline-icon.svg',
-    apple: '/xeadline-icon.svg',
+    icon: '/xeadspace-icon.svg',
+    apple: '/xeadspace-icon.svg',
   },
   openGraph: {
-    title: 'Xeadline - Own the internet',
+    title: 'Xeadspace - Own the internet',
     description: 'A decentralised forum built on Nostr and the Lightning Network',
-    url: 'https://xeadline.com',
-    siteName: 'Xeadline',
+    url: 'https://xead.space',
+    siteName: 'Xeadspace',
     images: [
       {
-        url: '/xeadline-icon.svg',
+        url: '/xeadspace-icon.svg',
         width: 800,
         height: 600,
-        alt: 'Xeadline Logo',
+        alt: 'Xeadspace Logo',
       },
     ],
     locale: 'en_US',
@@ -45,9 +45,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Xeadline - Own the internet',
+    title: 'Xeadspace - Own the internet',
     description: 'A decentralised forum built on Nostr and the Lightning Network',
-    images: ['/xeadline-icon.svg'],
+    images: ['/xeadspace-icon.svg'],
   },
   robots: {
     index: true,
@@ -64,7 +64,7 @@ export const metadata: Metadata = {
     google: 'verification_token', // Replace with actual Google verification token when available
   },
   alternates: {
-    canonical: 'https://xeadline.com',
+    canonical: 'https://xead.space',
   },
 }
 
