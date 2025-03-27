@@ -1360,7 +1360,8 @@ export const updateTopicSettings = createAsyncThunk(
         name,
         description,
         rules,
-        moderationSettings
+        moderationSettings,
+        memberCount: topic.memberCount || 1 // Ensure at least 1 member (the creator)
       };
       
       return updatedTopic;
