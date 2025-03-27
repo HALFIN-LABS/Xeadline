@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
-import { selectCurrentTopic } from '../../redux/slices/topicSlice';
+import { selectCurrentTopic, updateTopicSettings } from '../../redux/slices/topicSlice';
 import { selectCurrentUser } from '../../redux/slices/authSlice';
 import { Button } from '../ui/Button';
 
@@ -81,9 +81,6 @@ export default function CommunitySettingsPage({ topicId }: CommunitySettingsPage
     setSuccess(null);
     
     try {
-      // In a real implementation, this would dispatch a Redux action to update the topic
-      // For now, we'll just simulate a successful update
-      
       // Validate settings
       if (!name.trim()) {
         throw new Error('Community name is required');
@@ -94,13 +91,50 @@ export default function CommunitySettingsPage({ topicId }: CommunitySettingsPage
         throw new Error('At least one content type must be allowed');
       }
       
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Updating community settings:', {
+        topicId,
+        name,
+        description,
+        rules,
+        moderationType,
+        isPrivate,
+        allowedContentTypes
+      });
+      
+      // Map the moderationType to the expected format
+      // 'standard' in the UI maps to 'post-publication' in the backend
+      const mappedModerationType = moderationType === 'standard' ? 'post-publication' : moderationType;
+      
+      // Dispatch the action to update topic settings
+      const result = await dispatch(updateTopicSettings({
+        topicId,
+        name,
+        description,
+        rules,
+        moderationSettings: {
+          moderationType: mappedModerationType as 'pre-approval' | 'post-publication' | 'hybrid',
+          // Include other moderation settings from the current topic
+          ...(currentTopic?.moderationSettings?.autoApproveAfter !== undefined && {
+            autoApproveAfter: currentTopic.moderationSettings.autoApproveAfter
+          }),
+          ...(currentTopic?.moderationSettings?.requireLightningDeposit !== undefined && {
+            requireLightningDeposit: currentTopic.moderationSettings.requireLightningDeposit
+          }),
+          ...(currentTopic?.moderationSettings?.depositAmount !== undefined && {
+            depositAmount: currentTopic.moderationSettings.depositAmount
+          })
+        },
+        isPrivate,
+        allowedContentTypes
+      })).unwrap();
+      
+      console.log('Settings updated successfully:', result);
       
       // Show success message
       setSuccess('Community settings updated successfully');
       setIsLoading(false);
     } catch (err) {
+      console.error('Error updating community settings:', err);
       setError(typeof err === 'string' ? err : err instanceof Error ? err.message : 'Failed to update community settings');
       setIsLoading(false);
     }

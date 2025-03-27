@@ -1032,6 +1032,21 @@ export const topicSlice = createSlice({
       .addCase(updateTopicModerators.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+      })
+      
+      // Update topic settings
+      .addCase(updateTopicSettings.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateTopicSettings.fulfilled, (state, action) => {
+        state.loading = false;
+        // Update the topic in the store
+        state.byId[action.payload.id] = action.payload;
+      })
+      .addCase(updateTopicSettings.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
       });
   }
 });
@@ -1177,6 +1192,180 @@ export const updateTopicModerators = createAsyncThunk(
       return updatedTopic;
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Failed to update topic moderators');
+    }
+  }
+);
+
+// Update topic settings thunk
+export const updateTopicSettings = createAsyncThunk(
+  'topic/updateTopicSettings',
+  async (
+    {
+      topicId,
+      name,
+      description,
+      rules,
+      moderationSettings,
+      isPrivate,
+      allowedContentTypes,
+      privateKey
+    }: {
+      topicId: string;
+      name: string;
+      description: string;
+      rules: string[];
+      moderationSettings: {
+        moderationType: 'pre-approval' | 'post-publication' | 'hybrid';
+        autoApproveAfter?: number;
+        requireLightningDeposit?: boolean;
+        depositAmount?: number;
+      };
+      isPrivate: boolean;
+      allowedContentTypes: {
+        text: boolean;
+        link: boolean;
+        media: boolean;
+        poll: boolean;
+      };
+      privateKey?: string;
+    },
+    { rejectWithValue, getState }
+  ) => {
+    try {
+      console.log('Updating topic settings:', { topicId, name, description, rules, moderationSettings });
+      
+      const state = getState() as RootState;
+      const topic = state.topic.byId[topicId];
+      
+      if (!topic) {
+        return rejectWithValue('Topic not found');
+      }
+      
+      // Parse the topic ID to get creator pubkey and d-identifier
+      const [creatorPubkey, dIdentifier] = topicId.split(':');
+      
+      if (!creatorPubkey || !dIdentifier) {
+        return rejectWithValue('Invalid topic ID format');
+      }
+      
+      // Create the updated topic content
+      const topicContent = {
+        description,
+        rules,
+        image: topic.image,
+        banner: topic.banner,
+        moderationSettings,
+        moderators: topic.moderators,
+        isPrivate,
+        allowedContentTypes
+      };
+      
+      // Get the current user's public key
+      let userPubkey = '';
+      if (typeof window !== 'undefined' && window.nostr) {
+        try {
+          userPubkey = await window.nostr.getPublicKey();
+        } catch (error) {
+          console.error('Error getting public key from extension:', error);
+        }
+      } else if (privateKey) {
+        try {
+          userPubkey = getPublicKey(hexToBytes(privateKey));
+        } catch (error) {
+          console.error('Error deriving public key from private key:', error);
+          return rejectWithValue(`Error deriving public key: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+      
+      if (!userPubkey) {
+        return rejectWithValue('Could not determine user public key');
+      }
+      
+      // Verify that the current user is a moderator
+      if (!topic.moderators.includes(userPubkey)) {
+        return rejectWithValue('Only topic moderators can update settings');
+      }
+      
+      // Create an unsigned topic update event
+      const unsignedEvent: UnsignedEvent = {
+        kind: 34550, // NIP-72 topic definition
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+          ['d', dIdentifier],
+          ['name', name], // Use the new name
+          ['client', 'xeadline'],
+          ['xd', 'topic']
+        ],
+        content: JSON.stringify(topicContent),
+        pubkey: userPubkey
+      };
+      
+      console.log('Created unsigned event for topic update:', unsignedEvent);
+      
+      // Use the improved event signing service
+      const signingResult = await signEvent(unsignedEvent, {
+        privateKey,
+        timeout: 15000,
+        retryCount: 0
+      });
+      
+      if (!signingResult.success || !signingResult.event) {
+        console.error('Failed to sign topic update event:', signingResult.error);
+        return rejectWithValue(signingResult.error || 'Failed to sign topic update event');
+      }
+      
+      const signedEvent = signingResult.event;
+      
+      // Publish the event to Nostr relays
+      console.log('Publishing topic update event to Nostr relays:', {
+        id: signedEvent.id,
+        pubkey: signedEvent.pubkey,
+        kind: signedEvent.kind,
+        created_at: signedEvent.created_at,
+        tags: signedEvent.tags,
+        content: signedEvent.content
+      });
+      
+      const publishedTo = await nostrService.publishEvent(signedEvent);
+      console.log(`Published topic update event to ${publishedTo.length} relays:`, publishedTo);
+      
+      // Verify the event was published to at least one relay
+      if (publishedTo.length === 0) {
+        console.error('Failed to publish to any relays. Retrying...');
+        
+        // Retry publishing the event
+        let retrySuccess = false;
+        for (let i = 0; i < 3; i++) {
+          console.log(`Retry attempt ${i + 1} to publish topic update...`);
+          const retryPublishedTo = await nostrService.publishEvent(signedEvent);
+          if (retryPublishedTo.length > 0) {
+            console.log(`Successfully published topic update on retry ${i + 1}`);
+            retrySuccess = true;
+            break;
+          }
+          
+          // Wait a bit before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        if (!retrySuccess) {
+          console.error('All retry attempts failed. Topic update may not be properly synced.');
+          return rejectWithValue('Failed to publish topic update to any relays');
+        }
+      }
+      
+      // Create the updated topic object
+      const updatedTopic: Topic = {
+        ...topic,
+        name,
+        description,
+        rules,
+        moderationSettings
+      };
+      
+      return updatedTopic;
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Failed to update topic settings');
     }
   }
 );

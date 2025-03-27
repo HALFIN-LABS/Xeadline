@@ -45,7 +45,7 @@ export async function fetchSafariProfile(publicKey: string): Promise<ProfileData
       console.log('Safari fallback: Found user in database:', data);
       name = data.username;
       displayName = data.username;
-      nip05 = `${data.username}@xeadline.com`;
+      nip05 = `${data.username}@xead.space`;
       isVerified = true;
     }
   } catch (error) {

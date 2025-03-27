@@ -11,10 +11,13 @@ export default async function handler(req, res) {
   }
   
   try {
-    console.log(`NIP-05 proxy: Fetching from https://${domain}/.well-known/nostr.json?name=${name}`);
+    // If the domain is xeadline.com, use xead.space instead
+    const targetDomain = domain === 'xeadline.com' ? 'xead.space' : domain;
+    
+    console.log(`NIP-05 proxy: Fetching from https://${targetDomain}/.well-known/nostr.json?name=${name}`);
     
     // Fetch the NIP-05 data from the specified domain
-    const response = await fetch(`https://${domain}/.well-known/nostr.json?name=${name}`);
+    const response = await fetch(`https://${targetDomain}/.well-known/nostr.json?name=${name}`);
     
     if (!response.ok) {
       console.error(`NIP-05 proxy: Fetch failed with status ${response.status}`);

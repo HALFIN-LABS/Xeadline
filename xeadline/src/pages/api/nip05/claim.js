@@ -68,7 +68,7 @@ export default async function handler(req, res) {
     
     return res.status(201).json({
       success: true,
-      nip05: `${username}@xeadline.com`
+      nip05: `${username}@xead.space`
     });
   } catch (error) {
     console.error('Error claiming username:', error);
