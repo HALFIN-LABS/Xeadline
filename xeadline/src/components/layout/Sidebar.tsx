@@ -207,7 +207,6 @@ function XeadspaceIcon() {
       src="/xeadspace-icon.svg"
       alt="Xeadspace"
       className="h-5 w-5"
-      style={{ filter: 'brightness(0) invert(var(--sidebar-icon-invert, 0))' }}
     />
   );
 }

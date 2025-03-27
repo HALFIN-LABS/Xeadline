@@ -55,15 +55,11 @@ export default function Header() {
       <div className="h-14 flex items-center">
         {/* Logo */}
         <Link href="/" className="flex items-center px-4">
-          <div className="h-8 w-8 relative mr-2 flex-shrink-0 bg-bottle-green rounded-full flex items-center justify-center">
-            <img
-              src="/xeadspace-icon.svg"
-              alt="Xeadspace"
-              className="h-5 w-5"
-              style={{ filter: 'brightness(0) invert(1)' }}
-            />
-          </div>
-          <span className="text-xl font-bold text-white hidden sm:block" style={{ fontFamily: 'var(--font-roboto)' }}>Xeadspace</span>
+          <img
+            src="/xeadspace-icon.svg"
+            alt="Xeadspace"
+            className="h-8 w-8"
+          />
         </Link>
 
         {/* Mobile menu button */}
