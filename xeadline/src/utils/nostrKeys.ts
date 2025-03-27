@@ -80,18 +80,32 @@ export async function checkExtensionAvailability(): Promise<boolean> {
 
 /**
  * Gets the public key from a Nostr extension
- * 
+ *
+ * @param retries - Number of retry attempts (default: 3)
+ * @param delay - Delay between retries in ms (default: 100)
  * @returns A promise that resolves to the public key if available
  */
-export async function getExtensionPublicKey(): Promise<string | null> {
+export async function getExtensionPublicKey(retries = 3, delay = 100): Promise<string | null> {
   if (typeof window === 'undefined') return null
   
   try {
     if (window.nostr) {
-      return await window.nostr.getPublicKey()
+      try {
+        return await window.nostr.getPublicKey()
+      } catch (error) {
+        // If we have retries left, wait and try again
+        if (retries > 0) {
+          console.log(`Retrying getPublicKey (${retries} attempts left)...`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+          return getExtensionPublicKey(retries - 1, delay)
+        }
+        console.error('Failed to get public key after multiple attempts:', error)
+        return null
+      }
     }
     return null
   } catch (error) {
+    console.error('Error accessing window.nostr:', error)
     return null
   }
 }

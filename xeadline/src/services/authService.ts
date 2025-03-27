@@ -67,6 +67,9 @@ export async function initializeAuth(dispatch: AppDispatch): Promise<void> {
           console.log('AuthService: Session uses extension');
           if (hasExtension) {
             try {
+              // Add a small delay to ensure extension is fully loaded
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
               const publicKey = await getExtensionPublicKey();
               if (publicKey) {
                 console.log('AuthService: Successfully retrieved public key from extension');
