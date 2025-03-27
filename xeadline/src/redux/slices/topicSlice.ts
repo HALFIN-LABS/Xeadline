@@ -203,6 +203,8 @@ export const createTopic = createAsyncThunk(
           pubkey: signedEvent.pubkey
         };
         
+        console.log('Created unsigned subscription event:', unsignedSubscriptionEvent);
+        
         // Use the improved event signing service
         const signingResult = await signEvent(unsignedSubscriptionEvent, {
           privateKey,
@@ -210,11 +212,24 @@ export const createTopic = createAsyncThunk(
           retryCount: 0
         });
         
+        console.log('Subscription signing result:', {
+          success: signingResult.success,
+          hasEvent: !!signingResult.event,
+          error: signingResult.error
+        });
+        
         // Publish the subscription event
         if (signingResult.success && signingResult.event) {
           const signedSubscriptionEvent = signingResult.event;
+          console.log('Signed subscription event:', {
+            id: signedSubscriptionEvent.id,
+            pubkey: signedSubscriptionEvent.pubkey,
+            kind: signedSubscriptionEvent.kind,
+            tags: signedSubscriptionEvent.tags
+          });
+          
           const publishedTo = await nostrService.publishEvent(signedSubscriptionEvent);
-          console.log(`Published subscription event to ${publishedTo.length} relays`);
+          console.log(`Published subscription event to ${publishedTo.length} relays:`, publishedTo);
           
           // Verify the subscription was published to at least one relay
           if (publishedTo.length === 0) {
@@ -241,6 +256,7 @@ export const createTopic = createAsyncThunk(
               if (!storedSubscriptions.includes(topic.id)) {
                 storedSubscriptions.push(topic.id);
                 localStorage.setItem('topicSubscriptions', JSON.stringify(storedSubscriptions));
+                console.log('Added topic to local storage subscriptions:', topic.id);
               }
             } catch (e) {
               console.error('Error storing subscription in local storage:', e);
@@ -262,6 +278,8 @@ export const createTopic = createAsyncThunk(
 // Helper function to count topic subscribers
 const countTopicSubscribers = async (topicId: string): Promise<number> => {
   try {
+    console.log(`Counting subscribers for topic: ${topicId}`);
+    
     // Create a filter to get all subscription events for this topic
     const filters: Filter[] = [
       {
@@ -271,9 +289,22 @@ const countTopicSubscribers = async (topicId: string): Promise<number> => {
       }
     ];
 
+    console.log('Subscription filter:', filters);
+
     // Fetch all subscription events
     const events = await nostrService.getEvents(filters);
     console.log(`Found ${events.length} subscription events for topic ${topicId}`);
+
+    // Log all events for debugging
+    events.forEach((event, index) => {
+      console.log(`Subscription event ${index}:`, {
+        id: event.id,
+        pubkey: event.pubkey,
+        created_at: event.created_at,
+        tags: event.tags,
+        content: event.content
+      });
+    });
 
     // Process events to count current subscribers
     const subscriptionMap = new Map<string, { subscribed: boolean, timestamp: number }>();
@@ -286,11 +317,25 @@ const countTopicSubscribers = async (topicId: string): Promise<number> => {
       const action = event.tags.find((tag: string[]) => tag[0] === 'a')?.[1];
       const subscribed = action === 'subscribe';
       
+      console.log(`Processing subscription event from ${pubkey}:`, {
+        action,
+        subscribed,
+        timestamp
+      });
+      
       // Only update if this is a more recent event for this user
       if (!subscriptionMap.has(pubkey) || subscriptionMap.get(pubkey)!.timestamp < timestamp) {
         subscriptionMap.set(pubkey, { subscribed, timestamp });
+        console.log(`Updated subscription status for ${pubkey} to ${subscribed}`);
       }
     });
+
+    // Log the subscription map
+    console.log('Subscription map:', Array.from(subscriptionMap.entries()).map(([pubkey, data]) => ({
+      pubkey,
+      subscribed: data.subscribed,
+      timestamp: data.timestamp
+    })));
 
     // Count users who are currently subscribed
     const subscriberCount = Array.from(subscriptionMap.values())
@@ -1041,8 +1086,15 @@ export const topicSlice = createSlice({
       })
       .addCase(updateTopicSettings.fulfilled, (state, action) => {
         state.loading = false;
+        console.log('Updating topic in store:', {
+          id: action.payload.id,
+          memberCount: action.payload.memberCount
+        });
         // Update the topic in the store
         state.byId[action.payload.id] = action.payload;
+        console.log('Topic updated in store:', {
+          memberCount: state.byId[action.payload.id].memberCount
+        });
       })
       .addCase(updateTopicSettings.rejected, (state, action) => {
         state.loading = false;
@@ -1131,11 +1183,52 @@ export const updateTopicModerators = createAsyncThunk(
         pubkey: userPubkey
       };
       
+      console.log('DEBUG - About to sign topic update event:', {
+        eventKind: unsignedEvent.kind,
+        hasPrivateKey: !!privateKey,
+        hasNostrExtension: typeof window !== 'undefined' && !!window.nostr,
+        pubkeyFromExtension: userPubkey
+      });
+      
+      // Try direct extension signing first for debugging
+      if (typeof window !== 'undefined' && window.nostr) {
+        try {
+          console.log('DEBUG - Attempting direct extension signing for topic update');
+          // Create a copy of the event for direct extension signing
+          const eventForExtension = {
+            kind: unsignedEvent.kind,
+            created_at: unsignedEvent.created_at,
+            tags: unsignedEvent.tags,
+            content: unsignedEvent.content,
+            pubkey: userPubkey
+          };
+          
+          // Try to sign directly with the extension
+          window.nostr.signEvent(eventForExtension)
+            .then(signedEvent => {
+              console.log('DEBUG - Extension successfully signed topic update event directly:', !!signedEvent.sig);
+            })
+            .catch(err => {
+              console.error('DEBUG - Extension failed to sign topic update event directly:', err.message);
+            });
+        } catch (err) {
+          console.error('DEBUG - Error in direct extension signing attempt:', err);
+        }
+      }
+      
       // Use the improved event signing service
+      console.log('DEBUG - Using event signing service for topic update');
       const signingResult = await signEvent(unsignedEvent, {
         privateKey,
         timeout: 15000,
         retryCount: 0
+      });
+      
+      console.log('DEBUG - Signing result:', {
+        success: signingResult.success,
+        hasEvent: !!signingResult.event,
+        error: signingResult.error,
+        needsPassword: signingResult.needsPassword
       });
       
       if (!signingResult.success || !signingResult.event) {
@@ -1232,10 +1325,17 @@ export const updateTopicSettings = createAsyncThunk(
     { rejectWithValue, getState }
   ) => {
     try {
-      console.log('Updating topic settings:', { topicId, name, description, rules, moderationSettings });
-      
       const state = getState() as RootState;
       const topic = state.topic.byId[topicId];
+      
+      console.log('Updating topic settings:', {
+        topicId,
+        name,
+        description,
+        rules,
+        moderationSettings,
+        currentMemberCount: topic?.memberCount
+      });
       
       if (!topic) {
         return rejectWithValue('Topic not found');
@@ -1363,6 +1463,12 @@ export const updateTopicSettings = createAsyncThunk(
         moderationSettings,
         memberCount: topic.memberCount || 1 // Ensure at least 1 member (the creator)
       };
+      
+      console.log('Updated topic object:', {
+        id: updatedTopic.id,
+        name: updatedTopic.name,
+        memberCount: updatedTopic.memberCount
+      });
       
       return updatedTopic;
     } catch (error) {

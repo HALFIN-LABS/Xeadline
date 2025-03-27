@@ -19,14 +19,34 @@ export default function ModeratorDashboardPage() {
     async function fetchTopicData() {
       if (!slug) return;
       
+      console.log('ModeratorDashboardPage - Received slug:', slug);
+      console.log('ModeratorDashboardPage - Current URL:', window.location.pathname);
+      
       try {
-        // First try to get the topic ID from the slug
-        const topicId = await getTopicIdFromSlug(slug);
+        // Check if the slug contains a topic ID (format: topicId:slug)
+        const slugParts = slug.split(':');
+        let topicId;
+        let actualSlug = slug;
+        
+        if (slugParts.length > 1) {
+          // If the slug contains a colon, assume it's in the format topicId:slug
+          console.log('ModeratorDashboardPage - Detected combined format, extracting topic ID');
+          topicId = slugParts[0];
+          actualSlug = slugParts[1];
+          console.log('ModeratorDashboardPage - Extracted actual slug:', actualSlug);
+        } else {
+          // Otherwise, try to get the topic ID from the slug
+          console.log('ModeratorDashboardPage - Using regular slug lookup');
+          topicId = await getTopicIdFromSlug(slug);
+        }
+        
+        console.log('ModeratorDashboardPage - Resolved topic ID:', topicId);
         
         if (topicId) {
           // Then fetch the topic using the ID
           dispatch(fetchTopic(topicId));
         } else {
+          console.error('ModeratorDashboardPage - Topic ID not found for slug:', slug);
           setError('Topic not found');
         }
       } catch (err) {

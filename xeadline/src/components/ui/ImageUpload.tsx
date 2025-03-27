@@ -47,6 +47,7 @@ export default function ImageUpload({
     
     try {
       console.log(`Uploading ${file.name} (${file.type}, ${file.size} bytes)`);
+      console.log(`Upload parameters: imageType=${imageType}, topicId=${topicId || 'undefined'}`);
       
       // Create a local preview first
       try {
@@ -58,7 +59,7 @@ export default function ImageUpload({
       }
       
       // Use the blob utility function to upload the file
-      const url = await uploadToBlob(file, imageType, topicId);
+      const url = await uploadToBlob(file, imageType, 'image', topicId);
       
       console.log('Upload successful, URL:', url);
       

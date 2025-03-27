@@ -69,6 +69,15 @@ export async function uploadToBlob(
 ): Promise<string> {
   try {
     console.log(`Starting upload for ${mediaType} ${fileType}${topicId ? ` for topic ${topicId}` : ''}${postId ? ` for post ${postId}` : ''}`);
+    console.log('Upload parameters:', {
+      fileName: file.name,
+      fileType: file.type,
+      fileSize: file.size,
+      pathType: fileType,
+      mediaType,
+      topicId,
+      postId
+    });
     
     // Generate a unique upload ID if not provided
     const uniqueUploadId = uploadId || `upload-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;

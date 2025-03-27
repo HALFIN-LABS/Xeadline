@@ -61,9 +61,9 @@ async function checkSupabaseForNip05(pubkey: string): Promise<{ nip05?: string; 
       return { isVerified: false };
     }
 
-    // If we found a username, it's a verified xeadline.com username
+    // If we found a username, it's a verified xead.space username
     return {
-      nip05: `${data.username}@xeadline.com`,
+      nip05: `${data.username}@xead.space`,
       isVerified: true
     };
   } catch (error) {
