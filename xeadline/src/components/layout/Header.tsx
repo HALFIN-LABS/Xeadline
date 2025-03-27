@@ -58,7 +58,7 @@ export default function Header() {
           <img
             src="/xeadspace-icon.svg"
             alt="Xeadspace"
-            className="h-8 w-8"
+            className="h-14 w-14"
           />
         </Link>
 
