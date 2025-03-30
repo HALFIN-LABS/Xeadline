@@ -11,9 +11,10 @@ import MemberRoleSelector from '../moderation/MemberRoleSelector';
 import nostrService from '../../services/nostr/nostrService';
 import { Event, Filter } from 'nostr-tools';
 import { retrievePrivateKey } from '../../utils/nostrKeys';
+import { signEvent, UnsignedEvent } from '../../services/nostr/eventSigningService';
 
 // Define member roles
-export type MemberRole = 'member' | 'contributor' | 'moderator' | 'admin';
+export type MemberRole = 'member' | 'contributor' | 'moderator' | 'admin' | 'banned';
 
 // Define member interface
 interface Member {
@@ -74,12 +75,13 @@ const MemberItem = ({
       
       <div className="flex items-center">
         <div className={`px-3 py-1 rounded-full text-sm font-medium mr-4 ${
+          member.role === 'banned' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border border-red-300 dark:border-red-700' :
           member.role === 'admin' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
           member.role === 'moderator' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
           member.role === 'contributor' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
           'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
         }`}>
-          {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+          {member.role === 'banned' ? 'Banned' : member.role.charAt(0).toUpperCase() + member.role.slice(1)}
         </div>
         
         {isModerator && (
@@ -175,8 +177,8 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
         content: event.content
       })));
       
-      // Process events to get current subscribers
-      const subscriptionMap = new Map<string, { subscribed: boolean, timestamp: number }>();
+      // Process events to get current subscribers and their status
+      const subscriptionMap = new Map<string, { subscribed: boolean, banned: boolean, timestamp: number }>();
       
       // Enhanced logging for debugging subscription issues
       console.log('DEBUG - All event tags:', events.map(event => ({
@@ -189,14 +191,26 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
         const pubkey = event.pubkey;
         const timestamp = event.created_at;
         
-        // Check if this is a subscription or unsubscription event
-        // Look for the 'a' tag with value 'subscribe' or 'unsubscribe'
+        // Check if this is a subscription, unsubscription, or ban event
+        // Look for the 'a' tag with value 'subscribe', 'unsubscribe', 'ban', or 'unban'
         const actionTag = event.tags.find((tag: string[]) => tag[0] === 'a');
         const action = actionTag?.[1];
         
-        // Default to treating events without an explicit action tag as subscriptions
-        // This helps catch subscription events that might be missing the proper tag
-        const subscribed = action ? action === 'subscribe' : true;
+        // Handle different action types
+        let subscribed = true; // Default to subscribed if no action tag
+        let banned = false;
+        
+        if (action) {
+          if (action === 'unsubscribe') {
+            subscribed = false;
+          } else if (action === 'ban') {
+            subscribed = true; // User is still in the topic, just banned
+            banned = true;
+          } else if (action === 'unban') {
+            subscribed = true;
+            banned = false;
+          }
+        }
         
         // DEBUG: Log each event processing with more details
         console.log(`DEBUG - Processing event for pubkey ${pubkey.substring(0, 8)}...`, {
@@ -204,6 +218,7 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
           timestamp,
           action: action || 'MISSING_ACTION_TAG',
           subscribed,
+          banned,
           allTags: event.tags,
           hasExistingEntry: subscriptionMap.has(pubkey),
           existingTimestamp: subscriptionMap.has(pubkey) ? subscriptionMap.get(pubkey)!.timestamp : null,
@@ -213,7 +228,7 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
         
         // Only update if this is a more recent event for this user
         if (!subscriptionMap.has(pubkey) || subscriptionMap.get(pubkey)!.timestamp < timestamp) {
-          subscriptionMap.set(pubkey, { subscribed, timestamp });
+          subscriptionMap.set(pubkey, { subscribed, banned, timestamp });
         }
       });
       
@@ -258,7 +273,8 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
               mostRecentEventDate: new Date(mostRecentEvent.created_at * 1000).toISOString(),
               subscriptionMapTimestamp: subscriptionEntry.timestamp,
               subscriptionMapDate: new Date(subscriptionEntry.timestamp * 1000).toISOString(),
-              subscriptionMapSubscribed: subscriptionEntry.subscribed
+              subscriptionMapSubscribed: subscriptionEntry.subscribed,
+              subscriptionMapBanned: subscriptionEntry.banned
             });
           }
         });
@@ -269,6 +285,7 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
         pubkey: key,
         pubkeyShort: key.substring(0, 8),
         subscribed: value.subscribed,
+        banned: value.banned,
         timestamp: value.timestamp,
         date: new Date(value.timestamp * 1000).toISOString()
       })));
@@ -297,9 +314,10 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
       let skippedCount = 0;
       let addedCount = 0;
       
-      subscriptionMap.forEach(({ subscribed, timestamp }, pubkey) => {
+      subscriptionMap.forEach(({ subscribed, banned, timestamp }, pubkey) => {
         console.log(`DEBUG - Checking member: ${pubkey.substring(0, 8)}...`, {
           subscribed,
+          banned,
           timestamp,
           isModerator: currentTopic?.moderators.includes(pubkey)
         });
@@ -310,7 +328,7 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
             console.log(`DEBUG - Adding regular member: ${pubkey.substring(0, 8)}...`);
             allMembers.push({
               pubkey,
-              role: 'member' as MemberRole,
+              role: banned ? 'banned' as MemberRole : 'member' as MemberRole,
               joinedAt: timestamp,
               lastActive: timestamp
             });
@@ -340,13 +358,15 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
           // Check if this looks like a subscription event (has 'e' tag for the topic)
           const hasTopicTag = event.tags.some(tag => tag[0] === 'e' && tag[1] === topicId);
           const actionTag = event.tags.find(tag => tag[0] === 'a');
-          const isSubscribeAction = !actionTag || actionTag[1] === 'subscribe';
+          const action = actionTag?.[1];
+          const isSubscribeAction = !actionTag || action === 'subscribe';
+          const isBanAction = action === 'ban';
           
-          if (hasTopicTag && isSubscribeAction) {
+          if (hasTopicTag && (isSubscribeAction || isBanAction)) {
             console.log(`DEBUG - Found missing member in events: ${pubkey.substring(0, 8)}...`);
             allMembers.push({
               pubkey,
-              role: 'member' as MemberRole,
+              role: isBanAction ? 'banned' as MemberRole : 'member' as MemberRole,
               joinedAt: timestamp,
               lastActive: timestamp
             });
@@ -440,10 +460,111 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [pendingRoleChange, setPendingRoleChange] = useState<{pubkey: string, newRole: MemberRole} | null>(null);
+  const [roleChangeSuccess, setRoleChangeSuccess] = useState<string | null>(null);
+  
+  // Add a useEffect to clear success message after 5 seconds
+  useEffect(() => {
+    if (roleChangeSuccess) {
+      const timer = setTimeout(() => {
+        setRoleChangeSuccess(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [roleChangeSuccess]);
+  
+  // Function to publish a ban event to Nostr relays
+  const publishBanEvent = async (pubkey: string, isBanned: boolean): Promise<boolean> => {
+    try {
+      console.log(`Publishing ${isBanned ? 'ban' : 'unban'} event for ${pubkey}`);
+      
+      if (!currentTopic) {
+        console.error('Cannot publish ban event: No current topic');
+        return false;
+      }
+      
+      // Create an unsigned ban event
+      const unsignedEvent = {
+        kind: TOPIC_SUBSCRIPTION_KIND, // Use the same kind as subscriptions
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+          ['e', topicId], // Topic ID
+          ['p', pubkey], // Member's public key
+          ['a', isBanned ? 'ban' : 'unban'], // Action: ban or unban
+          ['client', 'xeadline']
+        ],
+        content: '',
+        pubkey: currentUser?.publicKey || ''
+      };
+      
+      console.log('Created unsigned ban event:', unsignedEvent);
+      
+      // Sign the event
+      const signingResult = await signEvent(unsignedEvent, {
+        privateKey: currentUser?.privateKey,
+        timeout: 15000,
+        retryCount: 0
+      });
+      
+      if (!signingResult.success || !signingResult.event) {
+        console.error('Failed to sign ban event:', signingResult.error);
+        
+        // If we have an encrypted private key, show the password modal
+        if (currentUser?.encryptedPrivateKey) {
+          setPendingRoleChange({ pubkey, newRole: isBanned ? 'banned' : 'member' });
+          setShowPasswordModal(true);
+          return false;
+        }
+        
+        // Try to use the extension directly as a last resort
+        if (typeof window !== 'undefined' && window.nostr) {
+          try {
+            // Get the public key from the extension
+            const extensionPubkey = await window.nostr.getPublicKey();
+            console.log('Got public key from extension:', extensionPubkey);
+            
+            // Create a new event for the extension
+            const eventForExtension = {
+              ...unsignedEvent,
+              pubkey: extensionPubkey
+            };
+            
+            // Sign with the extension
+            const signedEvent = await window.nostr.signEvent(eventForExtension);
+            
+            // Publish the event
+            const publishedTo = await nostrService.publishEvent(signedEvent);
+            console.log(`Published ban event to ${publishedTo.length} relays`);
+            
+            return publishedTo.length > 0;
+          } catch (extensionError) {
+            console.error('Failed to use extension for ban event:', extensionError);
+            return false;
+          }
+        }
+        
+        return false;
+      }
+      
+      const signedEvent = signingResult.event;
+      
+      // Publish the event to relays
+      const publishedTo = await nostrService.publishEvent(signedEvent);
+      console.log(`Published ban event to ${publishedTo.length} relays`);
+      
+      return publishedTo.length > 0;
+    } catch (error) {
+      console.error('Error publishing ban event:', error);
+      return false;
+    }
+  };
   
   const handleRoleChange = async (pubkey: string, newRole: MemberRole) => {
     try {
       console.log(`Changing role for ${pubkey} to ${newRole}`);
+      
+      // Check if this is a ban/unban action
+      const isBanAction = newRole === 'banned';
+      const isUnbanAction = members.find((m: Member) => m.pubkey === pubkey)?.role === 'banned' && newRole !== 'banned';
       // Enhanced debug logging for NIP-7 extension and authentication state
       console.log('DEBUG - Role change attempt:', {
         hasWindowObject: typeof window !== 'undefined',
@@ -492,12 +613,44 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
         }
       }
       
+      // Special handling for banned users
+      const isBanning = newRole === 'banned';
+      const roleDisplayName = isBanning ? 'Banned' : newRole.charAt(0).toUpperCase() + newRole.slice(1);
+      
+      // Handle ban/unban actions
+      if (isBanAction || isUnbanAction) {
+        console.log(`Processing ${isBanAction ? 'ban' : 'unban'} action for ${pubkey}`);
+        const success = await publishBanEvent(pubkey, isBanAction);
+        
+        if (success) {
+          console.log(`Successfully ${isBanAction ? 'banned' : 'unbanned'} user ${pubkey}`);
+          setRoleChangeSuccess(`Successfully ${isBanAction ? 'banned' : 'unbanned'} user`);
+          // Trigger a refresh of the member list to ensure UI is up to date
+          setTimeout(() => fetchMembers(), 1000);
+        } else {
+          console.error(`Failed to ${isBanAction ? 'ban' : 'unban'} user ${pubkey}`);
+          setError(`Failed to ${isBanAction ? 'ban' : 'unban'} user. Please try again.`);
+          return;
+        }
+      }
+      
       // Update the local state first for immediate UI feedback
-      setMembers(prevMembers =>
-        prevMembers.map(member =>
+      setMembers(prevMembers => {
+        const updatedMembers = prevMembers.map(member =>
           member.pubkey === pubkey ? { ...member, role: newRole } : member
-        )
-      );
+        );
+        
+        // Update the localStorage cache with the updated members
+        try {
+          const localStorageKey = `topic-members-${topicId}`;
+          localStorage.setItem(localStorageKey, JSON.stringify(updatedMembers));
+          console.log(`Updated ${updatedMembers.length} members in cache after role change`);
+        } catch (e) {
+          console.error('Error updating members in cache:', e);
+        }
+        
+        return updatedMembers;
+      });
       
       if (!currentTopic) {
         console.error('Cannot update moderators: No current topic');
@@ -525,6 +678,9 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
             })).unwrap();
             
             console.log(`Successfully added ${pubkey} as moderator`);
+            setRoleChangeSuccess(`Successfully updated user role to ${roleDisplayName}`);
+            // Trigger a refresh of the member list to ensure UI is up to date
+            setTimeout(() => fetchMembers(), 1000);
           } catch (error) {
             console.error('Error updating topic moderators:', error);
             
@@ -557,6 +713,9 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
               })).unwrap();
               
               console.log(`Successfully added ${pubkey} as moderator using extension`);
+              setRoleChangeSuccess(`Successfully updated user role to ${roleDisplayName}`);
+              // Trigger a refresh of the member list to ensure UI is up to date
+              setTimeout(() => fetchMembers(), 1000);
             } catch (extensionError) {
               console.error('DEBUG - Failed to use extension directly:', extensionError);
               // No private key available, but we can still show a more helpful message
@@ -588,6 +747,9 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
             })).unwrap();
             
             console.log(`Successfully removed ${pubkey} from moderators`);
+            setRoleChangeSuccess(`Successfully updated user role to ${roleDisplayName}`);
+            // Trigger a refresh of the member list to ensure UI is up to date
+            setTimeout(() => fetchMembers(), 1000);
           } catch (error) {
             console.error('Error updating topic moderators:', error);
             
@@ -620,6 +782,9 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
               })).unwrap();
               
               console.log(`Successfully removed ${pubkey} from moderators using extension`);
+              setRoleChangeSuccess(`Successfully updated user role to ${roleDisplayName}`);
+              // Trigger a refresh of the member list to ensure UI is up to date
+              setTimeout(() => fetchMembers(), 1000);
             } catch (extensionError) {
               console.error('DEBUG - Failed to use extension directly:', extensionError);
               // No private key available, but we can still show a more helpful message
@@ -683,7 +848,14 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
       // Close the modal and reset state
       setShowPasswordModal(false);
       setPassword('');
+      // Determine the role display name
+      const isBanning = newRole === 'banned';
+      const roleDisplayName = isBanning ? 'Banned' : newRole.charAt(0).toUpperCase() + newRole.slice(1);
+      setRoleChangeSuccess(`Successfully updated user role to ${roleDisplayName}`);
       setPendingRoleChange(null);
+      
+      // Trigger a refresh of the member list to ensure UI is up to date
+      setTimeout(() => fetchMembers(), 1000);
     } catch (error) {
       console.error('Error after password entry:', error);
       setPasswordError('Error processing request');
@@ -753,6 +925,20 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
       )}
       
       <div className="max-w-4xl mx-auto">
+        {/* Success Message */}
+        {roleChangeSuccess && (
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md p-4 mb-6 flex items-center justify-between">
+            <p className="text-green-700 dark:text-green-300">{roleChangeSuccess}</p>
+            <button
+              onClick={() => setRoleChangeSuccess(null)}
+              className="text-green-700 dark:text-green-300 hover:text-green-900 dark:hover:text-green-100"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        )}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             {currentTopic?.name} - Members
@@ -784,6 +970,7 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
               <option value="contributor">Contributors</option>
               <option value="moderator">Moderators</option>
               <option value="admin">Admins</option>
+              <option value="banned">Banned Users</option>
             </select>
           </div>
         </div>

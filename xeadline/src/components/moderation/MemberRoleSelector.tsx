@@ -102,6 +102,16 @@ export default function MemberRoleSelector({
             >
               Admin
             </button>
+            <button
+              onClick={() => handleRoleChange('banned')}
+              className={`block w-full text-left px-4 py-2 text-sm ${
+                currentRole === 'banned'
+                  ? 'bg-red-100 dark:bg-red-900 text-red-900 dark:text-red-200 font-medium'
+                  : 'text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/50'
+              }`}
+            >
+              Ban User
+            </button>
           </div>
         </div>
       )}
