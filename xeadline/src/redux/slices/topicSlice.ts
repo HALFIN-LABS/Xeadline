@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction, createSelector, createAction } from '@reduxjs/toolkit';
 import { RootState } from '../store';
 import { Event, getEventHash, Filter } from 'nostr-tools';
 import { hexToBytes } from '@noble/hashes/utils';
@@ -280,24 +280,31 @@ const countTopicSubscribers = async (topicId: string): Promise<number> => {
   try {
     console.log(`Counting subscribers for topic: ${topicId}`);
     
-    // Create a filter to get all subscription events for this topic
+    // Create filters to get all subscription events and ban events for this topic
     const filters: Filter[] = [
       {
         kinds: [TOPIC_SUBSCRIPTION_KIND],
         '#e': [topicId],
         limit: 1000
+      },
+      {
+        kinds: [34551], // NIP-72 topic subscription (same as TOPIC_SUBSCRIPTION_KIND)
+        '#e': [topicId],
+        '#a': ['ban', 'unban'], // Include ban/unban events
+        limit: 1000
       }
     ];
 
-    console.log('Subscription filter:', filters);
+    console.log('Subscription and ban filters:', filters);
 
-    // Fetch all subscription events
+    // Fetch all subscription and ban events
     const events = await nostrService.getEvents(filters);
-    console.log(`Found ${events.length} subscription events for topic ${topicId}`);
+    console.log(`Found ${events.length} subscription/ban events for topic ${topicId}`);
 
     // Log all events for debugging
     events.forEach((event, index) => {
-      console.log(`Subscription event ${index}:`, {
+      const action = event.tags.find((tag: string[]) => tag[0] === 'a')?.[1];
+      console.log(`Event ${index} (${action || 'unknown'}):`, {
         id: event.id,
         pubkey: event.pubkey,
         created_at: event.created_at,
@@ -307,26 +314,62 @@ const countTopicSubscribers = async (topicId: string): Promise<number> => {
     });
 
     // Process events to count current subscribers
-    const subscriptionMap = new Map<string, { subscribed: boolean, timestamp: number }>();
+    const subscriptionMap = new Map<string, { subscribed: boolean, timestamp: number, banned: boolean }>();
+    const banMap = new Map<string, { banned: boolean, timestamp: number }>();
 
+    // First process all ban/unban events
     events.forEach((event: Event) => {
-      const pubkey = event.pubkey;
-      const timestamp = event.created_at;
-      
-      // Check if this is a subscription or unsubscription event
       const action = event.tags.find((tag: string[]) => tag[0] === 'a')?.[1];
-      const subscribed = action === 'subscribe';
-      
-      console.log(`Processing subscription event from ${pubkey}:`, {
-        action,
-        subscribed,
-        timestamp
-      });
-      
-      // Only update if this is a more recent event for this user
-      if (!subscriptionMap.has(pubkey) || subscriptionMap.get(pubkey)!.timestamp < timestamp) {
-        subscriptionMap.set(pubkey, { subscribed, timestamp });
-        console.log(`Updated subscription status for ${pubkey} to ${subscribed}`);
+      if (action === 'ban' || action === 'unban') {
+        // This is a ban/unban event
+        const targetPubkey = event.tags.find((tag: string[]) => tag[0] === 'p')?.[1];
+        if (!targetPubkey) return;
+        
+        const timestamp = event.created_at;
+        const banned = action === 'ban';
+        
+        console.log(`Processing ${action} event for ${targetPubkey}:`, {
+          timestamp,
+          banned
+        });
+        
+        // Only update if this is a more recent ban/unban event for this user
+        if (!banMap.has(targetPubkey) || banMap.get(targetPubkey)!.timestamp < timestamp) {
+          banMap.set(targetPubkey, { banned, timestamp });
+          console.log(`Updated ban status for ${targetPubkey} to ${banned}`);
+        }
+      }
+    });
+
+    // Then process subscription events
+    events.forEach((event: Event) => {
+      const action = event.tags.find((tag: string[]) => tag[0] === 'a')?.[1];
+      if (action !== 'ban' && action !== 'unban') {
+        const pubkey = event.pubkey;
+        const timestamp = event.created_at;
+        
+        // Check if this is a subscription or unsubscription event
+        const subscribed = action === 'subscribe';
+        
+        console.log(`Processing subscription event from ${pubkey}:`, {
+          action,
+          subscribed,
+          timestamp
+        });
+        
+        // Only update if this is a more recent event for this user
+        if (!subscriptionMap.has(pubkey) || subscriptionMap.get(pubkey)!.timestamp < timestamp) {
+          // Check if the user is banned
+          const isBanned = banMap.has(pubkey) && banMap.get(pubkey)!.banned;
+          
+          subscriptionMap.set(pubkey, {
+            subscribed: subscribed && !isBanned, // User is not subscribed if banned
+            timestamp,
+            banned: isBanned
+          });
+          
+          console.log(`Updated subscription status for ${pubkey} to ${subscribed && !isBanned} (banned: ${isBanned})`);
+        }
       }
     });
 
@@ -334,12 +377,13 @@ const countTopicSubscribers = async (topicId: string): Promise<number> => {
     console.log('Subscription map:', Array.from(subscriptionMap.entries()).map(([pubkey, data]) => ({
       pubkey,
       subscribed: data.subscribed,
+      banned: data.banned,
       timestamp: data.timestamp
     })));
 
-    // Count users who are currently subscribed
+    // Count users who are currently subscribed and not banned
     const subscriberCount = Array.from(subscriptionMap.values())
-      .filter(({ subscribed }) => subscribed)
+      .filter(({ subscribed, banned }) => subscribed && !banned)
       .length;
 
     console.log(`Counted ${subscriberCount} current subscribers for topic ${topicId}`);
@@ -586,44 +630,114 @@ export const fetchUserSubscriptions = createAsyncThunk(
     try {
       console.log(`Fetching topic subscriptions for user: ${pubkey}`);
       
-      // Create a filter to get all topic subscription events for this user
+      // Create filters to get all topic subscription events for this user
+      // and all ban events targeting this user
       const filters: Filter[] = [
         {
           kinds: [TOPIC_SUBSCRIPTION_KIND],
           authors: [pubkey],
+          limit: 100
+        },
+        {
+          kinds: [TOPIC_SUBSCRIPTION_KIND],
+          '#a': ['ban', 'unban'],
+          '#p': [pubkey], // Ban events targeting this user
           limit: 100
         }
       ];
       
       // Fetch events from Nostr relays
       const events = await nostrService.getEvents(filters);
-      console.log(`Found ${events.length} subscription events`);
+      console.log(`Found ${events.length} subscription/ban events`);
       
       // Process events to get subscribed topic IDs
       // The most recent event for each topic ID determines the subscription status
-      const subscriptionMap = new Map<string, { subscribed: boolean, timestamp: number }>();
+      const subscriptionMap = new Map<string, { subscribed: boolean, timestamp: number, banned: boolean }>();
       
+      // First process all ban/unban events
       events.forEach((event: Event) => {
-        // Extract topic ID from the event tags
-        const topicTag = event.tags.find((tag: string[]) => tag[0] === 'e');
-        if (!topicTag || !topicTag[1]) return;
-        
-        const topicId = topicTag[1];
-        const timestamp = event.created_at;
-        
-        // Check if this is a subscription or unsubscription event
         const action = event.tags.find((tag: string[]) => tag[0] === 'a')?.[1];
-        const subscribed = action === 'subscribe';
-        
-        // Only update if this is a more recent event
-        if (!subscriptionMap.has(topicId) || subscriptionMap.get(topicId)!.timestamp < timestamp) {
-          subscriptionMap.set(topicId, { subscribed, timestamp });
+        if (action === 'ban' || action === 'unban') {
+          // Extract topic ID from the event tags
+          const topicTag = event.tags.find((tag: string[]) => tag[0] === 'e');
+          if (!topicTag || !topicTag[1]) return;
+          
+          const topicId = topicTag[1];
+          const timestamp = event.created_at;
+          const banned = action === 'ban';
+          
+          console.log(`Processing ${action} event for topic ${topicId}:`, {
+            timestamp,
+            banned
+          });
+          
+          // Get existing subscription data or create new entry
+          const existingData = subscriptionMap.get(topicId) || { subscribed: false, timestamp: 0, banned: false };
+          
+          // Only update ban status if this is a more recent ban/unban event
+          if (timestamp > existingData.timestamp || (timestamp === existingData.timestamp && banned)) {
+            subscriptionMap.set(topicId, {
+              ...existingData,
+              banned,
+              subscribed: existingData.subscribed && !banned, // If banned, not subscribed
+              timestamp: Math.max(timestamp, existingData.timestamp)
+            });
+            
+            console.log(`Updated ban status for topic ${topicId} to ${banned}`);
+          }
         }
       });
       
-      // Get the list of currently subscribed topic IDs
+      // Then process subscription events
+      events.forEach((event: Event) => {
+        const action = event.tags.find((tag: string[]) => tag[0] === 'a')?.[1];
+        if (action !== 'ban' && action !== 'unban' && event.pubkey === pubkey) {
+          // Extract topic ID from the event tags
+          const topicTag = event.tags.find((tag: string[]) => tag[0] === 'e');
+          if (!topicTag || !topicTag[1]) return;
+          
+          const topicId = topicTag[1];
+          const timestamp = event.created_at;
+          
+          // Check if this is a subscription or unsubscription event
+          const subscribed = action === 'subscribe';
+          
+          console.log(`Processing subscription event for topic ${topicId}:`, {
+            action,
+            subscribed,
+            timestamp
+          });
+          
+          // Get existing data or create new entry
+          const existingData = subscriptionMap.get(topicId) || { subscribed: false, timestamp: 0, banned: false };
+          
+          // Only update subscription status if this is a more recent event
+          if (timestamp > existingData.timestamp) {
+            // Check if the user is banned from this topic
+            const isBanned = existingData.banned;
+            
+            subscriptionMap.set(topicId, {
+              subscribed: subscribed && !isBanned, // User is not subscribed if banned
+              timestamp,
+              banned: isBanned
+            });
+            
+            console.log(`Updated subscription status for topic ${topicId} to ${subscribed && !isBanned} (banned: ${isBanned})`);
+          }
+        }
+      });
+      
+      // Log the subscription map
+      console.log('Subscription map:', Array.from(subscriptionMap.entries()).map(([topicId, data]) => ({
+        topicId,
+        subscribed: data.subscribed,
+        banned: data.banned,
+        timestamp: data.timestamp
+      })));
+      
+      // Get the list of currently subscribed topic IDs (not banned)
       const subscribedTopicIds = Array.from(subscriptionMap.entries())
-        .filter(([_, { subscribed }]) => subscribed)
+        .filter(([_, { subscribed, banned }]) => subscribed && !banned)
         .map(([topicId]) => topicId);
       
       console.log(`User is subscribed to ${subscribedTopicIds.length} topics from Nostr`);
@@ -1099,6 +1213,27 @@ export const topicSlice = createSlice({
       .addCase(updateTopicSettings.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+      })
+      
+      // Handle updateSubscriptionStatus action
+      .addCase(updateSubscriptionStatus, (state, action) => {
+        const { topicId, isSubscribed } = action.payload;
+        
+        // Update the subscribed array
+        if (isSubscribed && !state.subscribed.includes(topicId)) {
+          state.subscribed.push(topicId);
+        } else if (!isSubscribed && state.subscribed.includes(topicId)) {
+          state.subscribed = state.subscribed.filter(id => id !== topicId);
+        }
+        
+        // Update the member count if the topic exists in the store
+        if (state.byId[topicId]) {
+          if (isSubscribed) {
+            state.byId[topicId].memberCount = (state.byId[topicId].memberCount || 0) + 1;
+          } else {
+            state.byId[topicId].memberCount = Math.max(0, (state.byId[topicId].memberCount || 1) - 1);
+          }
+        }
       });
   }
 });
@@ -1476,6 +1611,9 @@ export const updateTopicSettings = createAsyncThunk(
     }
   }
 );
+
+// Add updateSubscriptionStatus reducer
+export const updateSubscriptionStatus = createAction<{ topicId: string, isSubscribed: boolean }>('topic/updateSubscriptionStatus');
 
 // Export actions
 export const { setCurrentTopic, clearCurrentTopic, clearError } = topicSlice.actions;

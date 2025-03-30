@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppSelector } from '../../redux/hooks';
 import { selectCurrentTopic } from '../../redux/slices/topicSlice';
 import { selectCurrentUser } from '../../redux/slices/authSlice';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import ModerationQueue from './ModerationQueue';
 import MemberListPage from './MemberListPage';
 import CommunitySettingsPage from './CommunitySettingsPage';
@@ -14,9 +15,75 @@ interface ModeratorDashboardProps {
 }
 
 export default function ModeratorDashboard({ topicId }: ModeratorDashboardProps) {
+  const params = useParams();
+  const urlSlug = params?.slug as string;
   const currentTopic = useAppSelector(selectCurrentTopic);
   const currentUser = useAppSelector(selectCurrentUser);
   const [activeTab, setActiveTab] = useState<'queue' | 'members' | 'settings'>('queue');
+  const [baseSlug, setBaseSlug] = useState<string>('');
+  
+  useEffect(() => {
+    // Get the current URL path
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+    console.log('Current path:', currentPath);
+    
+    // Extract the slug from the URL path
+    // The URL format is /t/[slug]/moderate
+    const pathParts = currentPath.split('/');
+    console.log('Path parts:', pathParts);
+    
+    if (pathParts.length >= 3 && pathParts[1] === 't') {
+      // The slug is the third part of the path
+      const extractedSlug = pathParts[2];
+      console.log('Extracted slug from URL path:', extractedSlug);
+      
+      // If the slug contains a unique identifier (e.g., modtest-m8ru63j6),
+      // extract just the base part (e.g., modtest)
+      const slugParts = extractedSlug.split('-');
+      // Check if the last part looks like a unique identifier (alphanumeric, 6-8 chars)
+      const lastPart = slugParts[slugParts.length - 1];
+      const isUniqueId = /^[a-z0-9]{6,8}$/.test(lastPart);
+      
+      if (slugParts.length > 1 && isUniqueId) {
+        // Remove the last part (unique identifier)
+        const baseSlugFromPath = slugParts.slice(0, -1).join('-');
+        console.log('Extracted base slug from path with unique ID:', baseSlugFromPath);
+        setBaseSlug(baseSlugFromPath);
+      } else {
+        // Use the full slug as is
+        setBaseSlug(extractedSlug);
+      }
+    } else if (urlSlug) {
+      // Fallback to the URL params
+      console.log('Using URL slug param for navigation:', urlSlug);
+      
+      // If the slug contains a unique identifier, extract just the base part
+      const slugParts = urlSlug.split('-');
+      const lastPart = slugParts[slugParts.length - 1];
+      const isUniqueId = /^[a-z0-9]{6,8}$/.test(lastPart);
+      
+      if (slugParts.length > 1 && isUniqueId) {
+        const baseSlugFromUrl = slugParts.slice(0, -1).join('-');
+        console.log('Extracted base slug from URL param with unique ID:', baseSlugFromUrl);
+        setBaseSlug(baseSlugFromUrl);
+      } else {
+        setBaseSlug(urlSlug);
+      }
+    } else if (currentTopic?.slug) {
+      // Last resort: extract from the topic slug
+      const slugParts = currentTopic.slug.split('-');
+      const lastPart = slugParts[slugParts.length - 1];
+      const isUniqueId = /^[a-z0-9]{6,8}$/.test(lastPart);
+      
+      if (slugParts.length > 1 && isUniqueId) {
+        const baseSlugFromTopic = slugParts.slice(0, -1).join('-');
+        console.log('Extracted base slug from topic with unique ID:', baseSlugFromTopic);
+        setBaseSlug(baseSlugFromTopic);
+      } else {
+        setBaseSlug(currentTopic.slug);
+      }
+    }
+  }, [urlSlug, currentTopic]);
   
   // Check if current user is a moderator
   const isModerator = currentTopic?.moderators.includes(currentUser?.publicKey || '') || false;
@@ -45,8 +112,11 @@ export default function ModeratorDashboard({ topicId }: ModeratorDashboardProps)
             Moderator Dashboard: {currentTopic.name}
           </h1>
           <Link
-            href={`/t/${currentTopic.slug}`}
+            href={`/t/${baseSlug || 'discover'}`}
             className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600"
+            onClick={() => {
+              console.log('Back to Community clicked, navigating to:', `/t/${baseSlug || 'discover'}`);
+            }}
           >
             Back to Community
           </Link>

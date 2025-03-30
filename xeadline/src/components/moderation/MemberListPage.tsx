@@ -76,9 +76,9 @@ const MemberItem = ({
       <div className="flex items-center">
         <div className={`px-3 py-1 rounded-full text-sm font-medium mr-4 ${
           member.role === 'banned' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border border-red-300 dark:border-red-700' :
-          member.role === 'admin' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
           member.role === 'moderator' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-          member.role === 'contributor' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+          member.role === 'admin' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+          member.role === 'contributor' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
           'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
         }`}>
           {member.role === 'banned' ? 'Banned' : member.role.charAt(0).toUpperCase() + member.role.slice(1)}
@@ -127,10 +127,42 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
       console.log('Fetching members for topic:', topicId);
       
       // Create a filter to get all subscription events for this topic
+      // Include a larger limit to ensure we get all events
       const filters: Filter[] = [
         {
           kinds: [TOPIC_SUBSCRIPTION_KIND],
           '#e': [topicId],
+          limit: 2000
+        }
+      ];
+      
+      // Add specific filters for ban events to ensure we catch them all
+      // Use multiple filters with different strategies to ensure we catch all ban events
+      const banFilters: Filter[] = [
+        {
+          kinds: [TOPIC_SUBSCRIPTION_KIND],
+          '#e': [topicId],
+          '#a': ['ban', 'unban'],
+          limit: 1000
+        },
+        // Additional filter to catch ban events that might not have the 'a' tag indexed properly
+        {
+          kinds: [TOPIC_SUBSCRIPTION_KIND],
+          '#e': [topicId],
+          '#p': [], // This will match any event with a 'p' tag, which ban events should have
+          limit: 1000
+        },
+        // Filter by content to catch ban events that might have been created with different tag structures
+        {
+          kinds: [TOPIC_SUBSCRIPTION_KIND],
+          '#e': [topicId],
+          limit: 1000
+        },
+        // Filter specifically for events with the 't' tag set to 'moderation'
+        {
+          kinds: [TOPIC_SUBSCRIPTION_KIND],
+          '#e': [topicId],
+          '#t': ['moderation'],
           limit: 1000
         }
       ];
@@ -151,7 +183,7 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
       
       // Fetch all subscription events from Nostr relays with a longer timeout
       console.log('Fetching subscription events with increased timeout...');
-      let events = await Promise.race([
+      let subscriptionEvents = await Promise.race([
         nostrService.getEvents(filters),
         // If getEvents takes too long, use a longer timeout but don't fail completely
         new Promise<Event[]>(resolve =>
@@ -162,7 +194,21 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
         )
       ]);
       
-      console.log(`Found ${events.length} subscription events for topic ${topicId}`);
+      console.log(`Found ${subscriptionEvents.length} subscription events for topic ${topicId}`);
+      
+      // Fetch specific ban events to ensure we don't miss any
+      console.log('Fetching ban events...');
+      let banEvents = await nostrService.getEvents(banFilters);
+      console.log(`Found ${banEvents.length} ban/unban events for topic ${topicId}`);
+      
+      // Merge all events, removing duplicates by event ID
+      const eventMap = new Map<string, Event>();
+      [...subscriptionEvents, ...banEvents].forEach(event => {
+        eventMap.set(event.id, event);
+      });
+      
+      let events = Array.from(eventMap.values());
+      console.log(`Combined ${events.length} unique events for processing`);
       
       // Sort events by timestamp (newest first) to ensure we process the most recent events first
       events = events.sort((a, b) => b.created_at - a.created_at);
@@ -177,58 +223,140 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
         content: event.content
       })));
       
+      // First, sort events by timestamp (newest first) to ensure we process the most recent events first
+      events = events.sort((a, b) => b.created_at - a.created_at);
+      
       // Process events to get current subscribers and their status
+      // We'll use two maps: one for regular subscription events and one for ban events
       const subscriptionMap = new Map<string, { subscribed: boolean, banned: boolean, timestamp: number }>();
+      const banMap = new Map<string, { banned: boolean, timestamp: number }>();
       
       // Enhanced logging for debugging subscription issues
       console.log('DEBUG - All event tags:', events.map(event => ({
         pubkey: event.pubkey.substring(0, 8),
         tags: event.tags,
-        created_at: event.created_at
+        created_at: event.created_at,
+        action: event.tags.find(tag => tag[0] === 'a')?.[1] || 'MISSING_ACTION_TAG'
       })));
       
+      // First pass: process all events to separate subscription and ban events
       events.forEach((event: Event) => {
         const pubkey = event.pubkey;
         const timestamp = event.created_at;
         
+        // Get the target user (if this is a ban event targeting another user)
+        const targetTag = event.tags.find((tag: string[]) => tag[0] === 'p');
+        const targetPubkey = targetTag?.[1] || pubkey; // If no target, assume it's about the event creator
+        
         // Check if this is a subscription, unsubscription, or ban event
-        // Look for the 'a' tag with value 'subscribe', 'unsubscribe', 'ban', or 'unban'
         const actionTag = event.tags.find((tag: string[]) => tag[0] === 'a');
         const action = actionTag?.[1];
         
-        // Handle different action types
-        let subscribed = true; // Default to subscribed if no action tag
-        let banned = false;
-        
-        if (action) {
-          if (action === 'unsubscribe') {
-            subscribed = false;
-          } else if (action === 'ban') {
-            subscribed = true; // User is still in the topic, just banned
-            banned = true;
-          } else if (action === 'unban') {
-            subscribed = true;
-            banned = false;
+        // Process based on action type
+        if (action === 'ban' || action === 'unban') {
+          // This is a ban/unban event targeting another user
+          const banned = action === 'ban';
+          
+          // Only update if this is a more recent ban event for this user
+          if (!banMap.has(targetPubkey) || banMap.get(targetPubkey)!.timestamp < timestamp) {
+            console.log(`DEBUG - Processing ${action} event for ${targetPubkey.substring(0, 8)} by ${pubkey.substring(0, 8)}`, {
+              timestamp,
+              eventId: event.id
+            });
+            banMap.set(targetPubkey, { banned, timestamp });
+            
+            // Also update the subscription map if it exists
+            if (subscriptionMap.has(targetPubkey)) {
+              const subInfo = subscriptionMap.get(targetPubkey)!;
+              // Only update if this ban event is more recent
+              if (subInfo.timestamp < timestamp) {
+                console.log(`DEBUG - Updating subscription map with ban status for ${targetPubkey.substring(0, 8)}`);
+                subscriptionMap.set(targetPubkey, {
+                  ...subInfo,
+                  banned,
+                  timestamp
+                });
+              }
+            } else {
+              // If the user isn't in the subscription map yet, add them
+              console.log(`DEBUG - Adding banned user to subscription map: ${targetPubkey.substring(0, 8)}`);
+              subscriptionMap.set(targetPubkey, {
+                subscribed: true, // Assume they're subscribed if they're being banned
+                banned,
+                timestamp
+              });
+            }
+          }
+        } else {
+          // This is a regular subscription event
+          const subscribed = action !== 'unsubscribe'; // Default to subscribed if no action tag or action is not 'unsubscribe'
+          
+          // Only update if this is a more recent subscription event for this user
+          if (!subscriptionMap.has(pubkey) || subscriptionMap.get(pubkey)!.timestamp < timestamp) {
+            console.log(`DEBUG - Processing ${action || 'subscription'} event for ${pubkey.substring(0, 8)}`, {
+              timestamp,
+              eventId: event.id
+            });
+            
+            // Check if there's a ban status for this user
+            const banInfo = banMap.get(pubkey);
+            const banned = banInfo ? banInfo.banned : false;
+            
+            subscriptionMap.set(pubkey, {
+              subscribed,
+              banned,
+              timestamp
+            });
           }
         }
-        
-        // DEBUG: Log each event processing with more details
-        console.log(`DEBUG - Processing event for pubkey ${pubkey.substring(0, 8)}...`, {
-          pubkey,
-          timestamp,
-          action: action || 'MISSING_ACTION_TAG',
-          subscribed,
-          banned,
-          allTags: event.tags,
-          hasExistingEntry: subscriptionMap.has(pubkey),
-          existingTimestamp: subscriptionMap.has(pubkey) ? subscriptionMap.get(pubkey)!.timestamp : null,
-          willUpdate: !subscriptionMap.has(pubkey) || subscriptionMap.get(pubkey)!.timestamp < timestamp,
-          eventId: event.id
+      });
+      
+      // Log the separate maps for debugging
+      console.log('DEBUG - Subscription map:', Array.from(subscriptionMap.entries()).map(([key, value]) => ({
+        pubkey: key.substring(0, 8),
+        subscribed: value.subscribed,
+        banned: value.banned,
+        timestamp: value.timestamp,
+        date: new Date(value.timestamp * 1000).toISOString()
+      })));
+      
+      console.log('DEBUG - Ban map:', Array.from(banMap.entries()).map(([key, value]) => ({
+        pubkey: key.substring(0, 8),
+        banned: value.banned,
+        timestamp: value.timestamp,
+        date: new Date(value.timestamp * 1000).toISOString()
+      })));
+      
+      // Now we need to merge the subscription and ban information
+      // Create a combined map with the final status of each user
+      const mergedStatusMap = new Map<string, { subscribed: boolean, banned: boolean, timestamp: number }>();
+      
+      // First, add all subscribed users
+      subscriptionMap.forEach((subInfo, pubkey) => {
+        mergedStatusMap.set(pubkey, {
+          subscribed: subInfo.subscribed,
+          banned: subInfo.banned, // Use the banned status from subscription map
+          timestamp: subInfo.timestamp
         });
-        
-        // Only update if this is a more recent event for this user
-        if (!subscriptionMap.has(pubkey) || subscriptionMap.get(pubkey)!.timestamp < timestamp) {
-          subscriptionMap.set(pubkey, { subscribed, banned, timestamp });
+      });
+      
+      // Then apply ban status
+      banMap.forEach((banInfo, pubkey) => {
+        const existingInfo = mergedStatusMap.get(pubkey);
+        if (existingInfo) {
+          // Update existing entry
+          existingInfo.banned = banInfo.banned;
+          // Use the most recent timestamp
+          if (banInfo.timestamp > existingInfo.timestamp) {
+            existingInfo.timestamp = banInfo.timestamp;
+          }
+        } else {
+          // Create new entry if user wasn't in subscription map
+          mergedStatusMap.set(pubkey, {
+            subscribed: true, // Assume subscribed if they're banned
+            banned: banInfo.banned,
+            timestamp: banInfo.timestamp
+          });
         }
       });
       
@@ -475,85 +603,163 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
   // Function to publish a ban event to Nostr relays
   const publishBanEvent = async (pubkey: string, isBanned: boolean): Promise<boolean> => {
     try {
-      console.log(`Publishing ${isBanned ? 'ban' : 'unban'} event for ${pubkey}`);
+      console.log(`Publishing ${isBanned ? 'ban' : 'unban'} event for ${pubkey}`, {
+        hasPrivateKey: !!currentUser?.privateKey,
+        hasEncryptedKey: !!currentUser?.encryptedPrivateKey,
+        hasExtension: typeof window !== 'undefined' && !!window.nostr
+      });
       
       if (!currentTopic) {
         console.error('Cannot publish ban event: No current topic');
         return false;
       }
       
-      // Create an unsigned ban event
-      const unsignedEvent = {
+      // Check if we have a signing method available before proceeding
+      if (!currentUser?.privateKey && !currentUser?.encryptedPrivateKey &&
+          !(typeof window !== 'undefined' && window.nostr)) {
+        console.error('No signing method available for ban event');
+        setError('No signing method available. Please log in with a private key or use a Nostr extension.');
+        return false;
+      }
+      
+      // Create an event for banning/unbanning with enhanced tags for better indexing
+      const banEvent: UnsignedEvent = {
         kind: TOPIC_SUBSCRIPTION_KIND, // Use the same kind as subscriptions
         created_at: Math.floor(Date.now() / 1000),
         tags: [
           ['e', topicId], // Topic ID
           ['p', pubkey], // Member's public key
           ['a', isBanned ? 'ban' : 'unban'], // Action: ban or unban
-          ['client', 'xeadline']
+          ['client', 'xeadline'],
+          ['t', 'moderation'], // Add a tag to help with indexing
+          ['d', `${isBanned ? 'ban' : 'unban'}-${Date.now().toString(36)}`] // Unique identifier for this event
         ],
-        content: '',
+        content: JSON.stringify({
+          action: isBanned ? 'ban' : 'unban',
+          targetPubkey: pubkey,
+          topicId: topicId,
+          timestamp: Math.floor(Date.now() / 1000)
+        }),
         pubkey: currentUser?.publicKey || ''
       };
       
-      console.log('Created unsigned ban event:', unsignedEvent);
+      console.log('Created ban event (unsigned):', banEvent);
       
-      // Sign the event
-      const signingResult = await signEvent(unsignedEvent, {
-        privateKey: currentUser?.privateKey,
-        timeout: 15000,
-        retryCount: 0
-      });
-      
-      if (!signingResult.success || !signingResult.event) {
-        console.error('Failed to sign ban event:', signingResult.error);
-        
-        // If we have an encrypted private key, show the password modal
-        if (currentUser?.encryptedPrivateKey) {
-          setPendingRoleChange({ pubkey, newRole: isBanned ? 'banned' : 'member' });
-          setShowPasswordModal(true);
-          return false;
-        }
-        
-        // Try to use the extension directly as a last resort
-        if (typeof window !== 'undefined' && window.nostr) {
-          try {
-            // Get the public key from the extension
-            const extensionPubkey = await window.nostr.getPublicKey();
-            console.log('Got public key from extension:', extensionPubkey);
-            
-            // Create a new event for the extension
-            const eventForExtension = {
-              ...unsignedEvent,
-              pubkey: extensionPubkey
-            };
-            
-            // Sign with the extension
-            const signedEvent = await window.nostr.signEvent(eventForExtension);
-            
-            // Publish the event
-            const publishedTo = await nostrService.publishEvent(signedEvent);
-            console.log(`Published ban event to ${publishedTo.length} relays`);
-            
-            return publishedTo.length > 0;
-          } catch (extensionError) {
-            console.error('Failed to use extension for ban event:', extensionError);
-            return false;
-          }
-        }
-        
+      // If we have an encrypted private key, show the password modal immediately
+      if (!currentUser?.privateKey && currentUser?.encryptedPrivateKey) {
+        console.log('Encrypted private key detected, showing password modal');
+        setPendingRoleChange({ pubkey, newRole: isBanned ? 'banned' : 'member' });
+        setShowPasswordModal(true);
         return false;
       }
       
-      const signedEvent = signingResult.event;
+      // Try to sign the event with the private key if available
+      if (currentUser?.privateKey) {
+        console.log('Signing ban event with private key');
+        const signingResult = await signEvent(banEvent, {
+          privateKey: currentUser.privateKey,
+          timeout: 15000,
+          retryCount: 3 // Increase retry count for more reliability
+        });
+        
+        if (signingResult.success && signingResult.event) {
+          console.log('Successfully signed ban event with private key');
+          const signedEvent = signingResult.event;
+          
+          // Publish the event to relays
+          const publishedTo = await nostrService.publishEvent(signedEvent);
+          console.log(`Published ban event to ${publishedTo.length} relays`);
+          
+          // Verify the ban event was published to at least one relay
+          if (publishedTo.length === 0) {
+            console.error('Failed to publish ban event to any relays. Retrying with increased timeout...');
+            
+            // Retry publishing the ban event with even longer timeout
+            let retrySuccess = false;
+            for (let i = 0; i < 5; i++) { // Increase to 5 retries
+              console.log(`Retry attempt ${i + 1} to publish ban event...`);
+              const retryPublishedTo = await nostrService.publishEvent(signedEvent);
+              
+              if (retryPublishedTo.length > 0) {
+                console.log(`Successfully published ban event on retry ${i + 1} to ${retryPublishedTo.length} relays`);
+                retrySuccess = true;
+                break;
+              }
+              
+              // Wait a bit longer before retrying
+              await new Promise(resolve => setTimeout(resolve, 2000)); // 2 seconds
+            }
+            
+            return retrySuccess;
+          }
+          
+          return true;
+        } else {
+          console.error('Failed to sign ban event with private key:', signingResult.error);
+        }
+      }
       
-      // Publish the event to relays
-      const publishedTo = await nostrService.publishEvent(signedEvent);
-      console.log(`Published ban event to ${publishedTo.length} relays`);
+      // Try to use the extension as a fallback
+      if (typeof window !== 'undefined' && window.nostr) {
+        try {
+          console.log('Attempting to sign ban event with extension');
+          
+          // Get the public key from the extension
+          const extensionPubkey = await window.nostr.getPublicKey();
+          console.log('Got public key from extension:', extensionPubkey);
+          
+          // Create a new event for the extension
+          const eventForExtension = {
+            ...banEvent,
+            pubkey: extensionPubkey
+          };
+          
+          // Sign with the extension
+          console.log('Sending event to extension for signing');
+          const signedEvent = await window.nostr.signEvent(eventForExtension);
+          console.log('Event signed by extension:', !!signedEvent.sig);
+          
+          // Publish the event
+          const publishedTo = await nostrService.publishEvent(signedEvent);
+          console.log(`Published ban event to ${publishedTo.length} relays`);
+          
+          // Verify the ban event was published to at least one relay
+          if (publishedTo.length === 0) {
+            console.error('Failed to publish ban event to any relays using extension. Retrying with increased timeout...');
+            
+            // Retry publishing the ban event with even longer timeout
+            let retrySuccess = false;
+            for (let i = 0; i < 5; i++) { // Increase to 5 retries
+              console.log(`Retry attempt ${i + 1} to publish ban event with extension...`);
+              const retryPublishedTo = await nostrService.publishEvent(signedEvent);
+              
+              if (retryPublishedTo.length > 0) {
+                console.log(`Successfully published ban event on retry ${i + 1} to ${retryPublishedTo.length} relays`);
+                retrySuccess = true;
+                break;
+              }
+              
+              // Wait a bit longer before retrying
+              await new Promise(resolve => setTimeout(resolve, 2000)); // 2 seconds
+            }
+            
+            return retrySuccess;
+          }
+          
+          return true;
+        } catch (extensionError) {
+          console.error('Failed to use extension for ban event:', extensionError);
+          setError(`Failed to sign with extension: ${extensionError instanceof Error ? extensionError.message : String(extensionError)}`);
+          return false;
+        }
+      }
       
-      return publishedTo.length > 0;
+      console.error('All signing methods failed');
+      setError('Failed to sign ban event. Please try again or use a different login method.');
+      return false;
     } catch (error) {
       console.error('Error publishing ban event:', error);
+      setError(`Error publishing ban event: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     }
   };
@@ -625,8 +831,51 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
         if (success) {
           console.log(`Successfully ${isBanAction ? 'banned' : 'unbanned'} user ${pubkey}`);
           setRoleChangeSuccess(`Successfully ${isBanAction ? 'banned' : 'unbanned'} user`);
+          
+          // Update the local state immediately for better UI feedback
+          setMembers(prevMembers => {
+            const updatedMembers = prevMembers.map(member =>
+              member.pubkey === pubkey ? { ...member, role: isBanAction ? 'banned' as MemberRole : 'member' as MemberRole } : member
+            );
+            
+            // Update the localStorage cache with the updated members
+            try {
+              const localStorageKey = `topic-members-${topicId}`;
+              localStorage.setItem(localStorageKey, JSON.stringify(updatedMembers));
+              console.log(`Updated ${updatedMembers.length} members in cache after ban/unban`);
+            } catch (e) {
+              console.error('Error updating members in cache:', e);
+            }
+            
+            return updatedMembers;
+          });
+          
+          // Import the updateSubscriptionStatus action to update Redux state
+          const { updateSubscriptionStatus } = await import('../../redux/slices/topicSlice');
+          
+          // Update the subscription status in Redux if banning
+          if (isBanAction) {
+            dispatch(updateSubscriptionStatus({
+              topicId,
+              isSubscribed: false
+            }));
+            
+            // Also update localStorage to reflect the change
+            if (typeof window !== 'undefined') {
+              try {
+                const storedSubscriptions = JSON.parse(localStorage.getItem('topicSubscriptions') || '[]');
+                const updatedSubscriptions = storedSubscriptions.filter((id: string) => id !== topicId);
+                localStorage.setItem('topicSubscriptions', JSON.stringify(updatedSubscriptions));
+                console.log('Updated localStorage to remove banned topic subscription');
+              } catch (e) {
+                console.error('Error updating localStorage subscriptions:', e);
+              }
+            }
+          }
+          
           // Trigger a refresh of the member list to ensure UI is up to date
-          setTimeout(() => fetchMembers(), 1000);
+          // Use a longer timeout to ensure the ban event has propagated to relays
+          setTimeout(() => fetchMembers(), 2000);
         } else {
           console.error(`Failed to ${isBanAction ? 'ban' : 'unban'} user ${pubkey}`);
           setError(`Failed to ${isBanAction ? 'ban' : 'unban'} user. Please try again.`);
@@ -658,8 +907,8 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
         return;
       }
       
-      // If the role is moderator, we need to update the topic moderators list
-      if (newRole === 'moderator' && !currentTopic.moderators.includes(pubkey)) {
+      // If the role is moderator or admin, we need to update the topic moderators list
+      if ((newRole === 'moderator' || newRole === 'admin') && !currentTopic.moderators.includes(pubkey)) {
         // Create a new moderators array with the new moderator added
         const updatedModerators = [...currentTopic.moderators, pubkey];
         
@@ -728,7 +977,7 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
             setError('To update moderators, you need to use a Nostr extension like nos2x or Alby, or log in with your private key. Please reload the page and try again with a different login method.');
           }
         }
-      } else if (newRole !== 'moderator' && currentTopic.moderators.includes(pubkey)) {
+      } else if (newRole !== 'moderator' && newRole !== 'admin' && currentTopic.moderators.includes(pubkey)) {
         // Remove from moderators if they were previously a moderator
         const updatedModerators = currentTopic.moderators.filter(mod => mod !== pubkey);
         
@@ -825,9 +1074,9 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
       
       // Determine the updated moderators list
       let updatedModerators: string[];
-      if (newRole === 'moderator' && !currentTopic.moderators.includes(pubkey)) {
+      if ((newRole === 'moderator' || newRole === 'admin') && !currentTopic.moderators.includes(pubkey)) {
         updatedModerators = [...currentTopic.moderators, pubkey];
-      } else if (newRole !== 'moderator' && currentTopic.moderators.includes(pubkey)) {
+      } else if (newRole !== 'moderator' && newRole !== 'admin' && currentTopic.moderators.includes(pubkey)) {
         updatedModerators = currentTopic.moderators.filter(mod => mod !== pubkey);
       } else {
         // No change needed to moderators list

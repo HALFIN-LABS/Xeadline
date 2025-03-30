@@ -12,6 +12,8 @@ import {
   unsubscribeFromTopic,
   selectIsSubscribed
 } from '../../redux/slices/topicSlice';
+import nostrService from '../../services/nostr/nostrService';
+import { Event } from 'nostr-tools';
 import { fetchPostsForTopic, selectPostsByTopic, selectPostsLoading } from '../../redux/slices/postSlice';
 import { selectCurrentUser } from '../../redux/slices/authSlice';
 import Image from 'next/image';
@@ -63,6 +65,7 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
   const [showPostModal, setShowPostModal] = useState(false);
   const [showModerationModal, setShowModerationModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
+  const [isBanned, setIsBanned] = useState(false);
   
   const handlePostModalClose = useCallback(() => {
     setShowPostModal(false);
@@ -79,8 +82,165 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
   useEffect(() => {
     if (topic) {
       dispatch(fetchPostsForTopic(topicId));
+      
+      // Check if the current user is banned from this topic and verify subscription status
+      if (currentUser) {
+        checkIfUserIsBanned();
+      }
     }
-  }, [dispatch, topicId, topic]);
+  }, [dispatch, topicId, topic, currentUser]);
+  
+  // Add an additional effect to recheck subscription status when isSubscribed changes
+  // This helps ensure UI consistency with the actual subscription state
+  useEffect(() => {
+    if (topic && currentUser) {
+      console.log(`Subscription status changed to: ${isSubscribed ? 'subscribed' : 'not subscribed'}`);
+      // Force a recheck of the actual subscription status from Nostr after a short delay
+      // This helps catch any discrepancies between Redux state and actual Nostr state
+      const timer = setTimeout(() => {
+        checkIfUserIsBanned();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isSubscribed, topic, currentUser]);
+  
+  // Function to check if the current user is banned from the topic and verify subscription status
+  const checkIfUserIsBanned = async () => {
+    if (!currentUser || !topic) return;
+    
+    try {
+      console.log(`Checking if user ${currentUser.publicKey} is banned from topic ${topicId}`);
+      
+      // Create filters to get all ban events and subscription events for this topic targeting the current user
+      const banFilters = [
+        {
+          kinds: [34551], // NIP-72 topic subscription
+          '#e': [topicId],
+          '#a': ['ban', 'unban'],
+          '#p': [currentUser.publicKey],
+          limit: 100
+        }
+      ];
+      
+      const subscriptionFilters = [
+        {
+          kinds: [34551], // NIP-72 topic subscription
+          '#e': [topicId],
+          authors: [currentUser.publicKey],
+          limit: 100
+        }
+      ];
+      
+      // Fetch ban events from Nostr relays
+      const banEvents = await nostrService.getEvents(banFilters);
+      console.log(`Found ${banEvents.length} ban/unban events for user in topic ${topicId}`);
+      
+      // Fetch subscription events from Nostr relays
+      const subscriptionEvents = await nostrService.getEvents(subscriptionFilters);
+      console.log(`Found ${subscriptionEvents.length} subscription events for user in topic ${topicId}`);
+      
+      // Process ban events
+      let isBannedUser = false;
+      if (banEvents.length > 0) {
+        // Sort events by timestamp (newest first)
+        const sortedEvents = banEvents.sort((a: Event, b: Event) => b.created_at - a.created_at);
+        
+        // Get the most recent ban/unban event
+        const latestEvent = sortedEvents[0];
+        
+        // Check if it's a ban event
+        const actionTag = latestEvent.tags.find((tag: string[]) => tag[0] === 'a');
+        const action = actionTag?.[1];
+        
+        // If the most recent event is a ban event, the user is banned
+        isBannedUser = action === 'ban';
+        console.log(`User is ${isBannedUser ? 'banned' : 'not banned'} from topic ${topicId}`);
+        
+        setIsBanned(isBannedUser);
+      } else {
+        console.log(`No ban events found for user in topic ${topicId}`);
+        setIsBanned(false);
+      }
+      
+      // Process subscription events to verify subscription status
+      if (subscriptionEvents.length > 0 && !isBannedUser) {
+        // Sort events by timestamp (newest first)
+        const sortedEvents = subscriptionEvents.sort((a: Event, b: Event) => b.created_at - a.created_at);
+        
+        // Get the most recent subscription event
+        const latestEvent = sortedEvents[0];
+        
+        // Check if it's a subscription or unsubscription event
+        const actionTag = latestEvent.tags.find((tag: string[]) => tag[0] === 'a');
+        const action = actionTag?.[1];
+        
+        // Determine if the user is subscribed based on the most recent event
+        const isUserSubscribed = action !== 'unsubscribe'; // If not explicitly unsubscribed, consider subscribed
+        console.log(`User subscription status from Nostr: ${isUserSubscribed ? 'subscribed' : 'unsubscribed'}`);
+        
+        // If the Nostr status differs from Redux status, update Redux
+        if (isUserSubscribed !== isSubscribed) {
+          console.log(`Updating subscription status in Redux: ${isUserSubscribed}`);
+          
+          // Import the updateSubscriptionStatus action
+          const { updateSubscriptionStatus } = await import('../../redux/slices/topicSlice');
+          
+          // Dispatch the action to update the subscription status in Redux
+          dispatch(updateSubscriptionStatus({
+            topicId,
+            isSubscribed: isUserSubscribed
+          }));
+          
+          // Also update localStorage to reflect the change
+          if (typeof window !== 'undefined') {
+            try {
+              const storedSubscriptions = JSON.parse(localStorage.getItem('topicSubscriptions') || '[]');
+              
+              if (isUserSubscribed && !storedSubscriptions.includes(topicId)) {
+                storedSubscriptions.push(topicId);
+              } else if (!isUserSubscribed && storedSubscriptions.includes(topicId)) {
+                const updatedSubscriptions = storedSubscriptions.filter((id: string) => id !== topicId);
+                localStorage.setItem('topicSubscriptions', JSON.stringify(updatedSubscriptions));
+              }
+              
+              localStorage.setItem('topicSubscriptions', JSON.stringify(storedSubscriptions));
+              console.log('Updated localStorage with subscription status');
+            } catch (e) {
+              console.error('Error updating localStorage subscriptions:', e);
+            }
+          }
+        }
+      }
+      
+      // If the user is banned, ensure they are not shown as subscribed
+      if (isBannedUser && isSubscribed) {
+        // Import the updateSubscriptionStatus action
+        const { updateSubscriptionStatus } = await import('../../redux/slices/topicSlice');
+        
+        // Dispatch the action to update the subscription status in Redux
+        dispatch(updateSubscriptionStatus({
+          topicId,
+          isSubscribed: false
+        }));
+        
+        // Also update localStorage to reflect the change
+        if (typeof window !== 'undefined') {
+          try {
+            const storedSubscriptions = JSON.parse(localStorage.getItem('topicSubscriptions') || '[]');
+            const updatedSubscriptions = storedSubscriptions.filter((id: string) => id !== topicId);
+            localStorage.setItem('topicSubscriptions', JSON.stringify(updatedSubscriptions));
+            console.log('Updated localStorage to remove banned topic subscription');
+          } catch (e) {
+            console.error('Error updating localStorage subscriptions:', e);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking user status:', error);
+      setIsBanned(false);
+    }
+  };
   
   const handlePasswordSubmit = useCallback(async () => {
     if (!currentUser || !password) return;
@@ -105,13 +265,62 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
           privateKey
         })).unwrap();
         console.log('Successfully subscribed to topic after password entry');
+        
+        // Import the updateSubscriptionStatus action to ensure UI is updated immediately
+        const { updateSubscriptionStatus } = await import('../../redux/slices/topicSlice');
+        
+        // Explicitly update the subscription status in Redux to ensure UI consistency
+        dispatch(updateSubscriptionStatus({
+          topicId,
+          isSubscribed: true
+        }));
+        
+        // Also update localStorage for persistence between page refreshes
+        if (typeof window !== 'undefined') {
+          try {
+            const storedSubscriptions = JSON.parse(localStorage.getItem('topicSubscriptions') || '[]');
+            if (!storedSubscriptions.includes(topicId)) {
+              storedSubscriptions.push(topicId);
+              localStorage.setItem('topicSubscriptions', JSON.stringify(storedSubscriptions));
+              console.log('Updated localStorage with new subscription after password entry');
+            }
+          } catch (e) {
+            console.error('Error updating localStorage subscriptions:', e);
+          }
+        }
       } else if (pendingAction === 'unsubscribe') {
         await dispatch(unsubscribeFromTopic({
           topicId,
           privateKey
         })).unwrap();
         console.log('Successfully unsubscribed from topic after password entry');
+        
+        // Import the updateSubscriptionStatus action to ensure UI is updated immediately
+        const { updateSubscriptionStatus } = await import('../../redux/slices/topicSlice');
+        
+        // Explicitly update the subscription status in Redux to ensure UI consistency
+        dispatch(updateSubscriptionStatus({
+          topicId,
+          isSubscribed: false
+        }));
+        
+        // Also update localStorage for persistence between page refreshes
+        if (typeof window !== 'undefined') {
+          try {
+            const storedSubscriptions = JSON.parse(localStorage.getItem('topicSubscriptions') || '[]');
+            const updatedSubscriptions = storedSubscriptions.filter((id: string) => id !== topicId);
+            localStorage.setItem('topicSubscriptions', JSON.stringify(updatedSubscriptions));
+            console.log('Updated localStorage to remove subscription after password entry');
+          } catch (e) {
+            console.error('Error updating localStorage subscriptions:', e);
+          }
+        }
       }
+      
+      // Trigger a verification of the subscription status from Nostr after a short delay
+      setTimeout(() => {
+        checkIfUserIsBanned();
+      }, 1000);
       
       // Close the modal and reset state
       setShowPasswordModal(false);
@@ -147,6 +356,35 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
         })).unwrap();
         
         console.log('Successfully subscribed to topic');
+        
+        // Import the updateSubscriptionStatus action to ensure UI is updated immediately
+        const { updateSubscriptionStatus } = await import('../../redux/slices/topicSlice');
+        
+        // Explicitly update the subscription status in Redux to ensure UI consistency
+        dispatch(updateSubscriptionStatus({
+          topicId,
+          isSubscribed: true
+        }));
+        
+        // Also update localStorage for persistence between page refreshes
+        if (typeof window !== 'undefined') {
+          try {
+            const storedSubscriptions = JSON.parse(localStorage.getItem('topicSubscriptions') || '[]');
+            if (!storedSubscriptions.includes(topicId)) {
+              storedSubscriptions.push(topicId);
+              localStorage.setItem('topicSubscriptions', JSON.stringify(storedSubscriptions));
+              console.log('Updated localStorage with new subscription');
+            }
+          } catch (e) {
+            console.error('Error updating localStorage subscriptions:', e);
+          }
+        }
+        
+        // Trigger a verification of the subscription status from Nostr after a short delay
+        setTimeout(() => {
+          checkIfUserIsBanned();
+        }, 1000);
+        
         setIsSubscribing(false);
       } catch (error) {
         console.error('Error subscribing to topic:', error);
@@ -190,6 +428,33 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
         })).unwrap();
         
         console.log('Successfully unsubscribed from topic');
+        
+        // Import the updateSubscriptionStatus action to ensure UI is updated immediately
+        const { updateSubscriptionStatus } = await import('../../redux/slices/topicSlice');
+        
+        // Explicitly update the subscription status in Redux to ensure UI consistency
+        dispatch(updateSubscriptionStatus({
+          topicId,
+          isSubscribed: false
+        }));
+        
+        // Also update localStorage for persistence between page refreshes
+        if (typeof window !== 'undefined') {
+          try {
+            const storedSubscriptions = JSON.parse(localStorage.getItem('topicSubscriptions') || '[]');
+            const updatedSubscriptions = storedSubscriptions.filter((id: string) => id !== topicId);
+            localStorage.setItem('topicSubscriptions', JSON.stringify(updatedSubscriptions));
+            console.log('Updated localStorage to remove subscription');
+          } catch (e) {
+            console.error('Error updating localStorage subscriptions:', e);
+          }
+        }
+        
+        // Trigger a verification of the subscription status from Nostr after a short delay
+        setTimeout(() => {
+          checkIfUserIsBanned();
+        }, 1000);
+        
         setIsSubscribing(false);
       } catch (error) {
         console.error('Error unsubscribing from topic:', error);
@@ -234,6 +499,26 @@ export default function TopicDetailPage({ topicId }: TopicDetailPageProps) {
         <Link href="/t/discover" className="mt-4 inline-block px-4 py-2 bg-bottle-green text-white rounded-md hover:bg-bottle-green-700 transition-colors">
           Discover Topics
         </Link>
+      </div>
+    );
+  }
+  
+  // Show banned message if the user is banned from this topic
+  if (currentUser && isBanned) {
+    return (
+      <div className="container mx-auto px-4 py-6">
+        <div className="max-w-2xl mx-auto bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 my-4 text-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto mb-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <h2 className="text-2xl font-bold text-red-700 dark:text-red-300 mb-2">Access Denied</h2>
+          <p className="text-red-600 dark:text-red-400 mb-6">
+            You have been banned from this topic and cannot view its content.
+          </p>
+          <Link href="/t/discover" className="inline-block px-4 py-2 bg-bottle-green text-white rounded-md hover:bg-bottle-green-700 transition-colors">
+            Discover Other Topics
+          </Link>
+        </div>
       </div>
     );
   }
