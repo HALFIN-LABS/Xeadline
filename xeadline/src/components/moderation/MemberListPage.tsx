@@ -133,20 +133,83 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
         }
       ];
       
-      // Fetch all subscription events from Nostr relays
-      const events = await nostrService.getEvents(filters);
+      // Store member data in localStorage to provide consistency between page refreshes
+      const localStorageKey = `topic-members-${topicId}`;
+      let cachedMembers: Member[] = [];
+      
+      try {
+        const cachedData = localStorage.getItem(localStorageKey);
+        if (cachedData) {
+          cachedMembers = JSON.parse(cachedData);
+          console.log(`Loaded ${cachedMembers.length} members from cache`);
+        }
+      } catch (e) {
+        console.error('Error loading cached members:', e);
+      }
+      
+      // Fetch all subscription events from Nostr relays with a longer timeout
+      console.log('Fetching subscription events with increased timeout...');
+      let events = await Promise.race([
+        nostrService.getEvents(filters),
+        // If getEvents takes too long, use a longer timeout but don't fail completely
+        new Promise<Event[]>(resolve =>
+          setTimeout(() => {
+            console.log('Using extended timeout for event fetching');
+            nostrService.getEvents(filters).then(resolve);
+          }, 10000)
+        )
+      ]);
+      
       console.log(`Found ${events.length} subscription events for topic ${topicId}`);
+      
+      // Sort events by timestamp (newest first) to ensure we process the most recent events first
+      events = events.sort((a, b) => b.created_at - a.created_at);
+      
+      // DEBUG: Log all events to inspect their structure (sorted by timestamp)
+      console.log('DEBUG - All subscription events (sorted by timestamp, newest first):', events.map(event => ({
+        id: event.id,
+        pubkey: event.pubkey,
+        created_at: event.created_at,
+        created_at_date: new Date(event.created_at * 1000).toISOString(),
+        tags: event.tags,
+        content: event.content
+      })));
       
       // Process events to get current subscribers
       const subscriptionMap = new Map<string, { subscribed: boolean, timestamp: number }>();
+      
+      // Enhanced logging for debugging subscription issues
+      console.log('DEBUG - All event tags:', events.map(event => ({
+        pubkey: event.pubkey.substring(0, 8),
+        tags: event.tags,
+        created_at: event.created_at
+      })));
       
       events.forEach((event: Event) => {
         const pubkey = event.pubkey;
         const timestamp = event.created_at;
         
         // Check if this is a subscription or unsubscription event
-        const action = event.tags.find((tag: string[]) => tag[0] === 'a')?.[1];
-        const subscribed = action === 'subscribe';
+        // Look for the 'a' tag with value 'subscribe' or 'unsubscribe'
+        const actionTag = event.tags.find((tag: string[]) => tag[0] === 'a');
+        const action = actionTag?.[1];
+        
+        // Default to treating events without an explicit action tag as subscriptions
+        // This helps catch subscription events that might be missing the proper tag
+        const subscribed = action ? action === 'subscribe' : true;
+        
+        // DEBUG: Log each event processing with more details
+        console.log(`DEBUG - Processing event for pubkey ${pubkey.substring(0, 8)}...`, {
+          pubkey,
+          timestamp,
+          action: action || 'MISSING_ACTION_TAG',
+          subscribed,
+          allTags: event.tags,
+          hasExistingEntry: subscriptionMap.has(pubkey),
+          existingTimestamp: subscriptionMap.has(pubkey) ? subscriptionMap.get(pubkey)!.timestamp : null,
+          willUpdate: !subscriptionMap.has(pubkey) || subscriptionMap.get(pubkey)!.timestamp < timestamp,
+          eventId: event.id
+        });
         
         // Only update if this is a more recent event for this user
         if (!subscriptionMap.has(pubkey) || subscriptionMap.get(pubkey)!.timestamp < timestamp) {
@@ -154,12 +217,72 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
         }
       });
       
+      // Check for users with multiple events and verify we're using the most recent one
+      const userEventCounts = new Map<string, number>();
+      events.forEach(event => {
+        const pubkey = event.pubkey;
+        userEventCounts.set(pubkey, (userEventCounts.get(pubkey) || 0) + 1);
+      });
+      
+      const usersWithMultipleEvents = Array.from(userEventCounts.entries())
+        .filter(([_, count]) => count > 1)
+        .map(([pubkey, count]) => ({ pubkey, count }));
+      
+      if (usersWithMultipleEvents.length > 0) {
+        console.log('DEBUG - Users with multiple events:', usersWithMultipleEvents);
+        
+        // For each user with multiple events, log all their events sorted by timestamp
+        usersWithMultipleEvents.forEach(({ pubkey, count }) => {
+          const userEvents = events
+            .filter(event => event.pubkey === pubkey)
+            .sort((a, b) => b.created_at - a.created_at);
+          
+          console.log(`DEBUG - All events for user ${pubkey.substring(0, 8)} (${count} events, newest first):`,
+            userEvents.map(event => ({
+              id: event.id,
+              created_at: event.created_at,
+              created_at_date: new Date(event.created_at * 1000).toISOString(),
+              tags: event.tags,
+              action: event.tags.find(tag => tag[0] === 'a')?.[1] || 'MISSING_ACTION_TAG'
+            }))
+          );
+          
+          // Check if the subscription map has the most recent event for this user
+          const mostRecentEvent = userEvents[0];
+          const subscriptionEntry = subscriptionMap.get(pubkey);
+          
+          if (subscriptionEntry) {
+            const usingMostRecent = subscriptionEntry.timestamp === mostRecentEvent.created_at;
+            console.log(`DEBUG - For user ${pubkey.substring(0, 8)}: Using most recent event? ${usingMostRecent}`, {
+              mostRecentEventTimestamp: mostRecentEvent.created_at,
+              mostRecentEventDate: new Date(mostRecentEvent.created_at * 1000).toISOString(),
+              subscriptionMapTimestamp: subscriptionEntry.timestamp,
+              subscriptionMapDate: new Date(subscriptionEntry.timestamp * 1000).toISOString(),
+              subscriptionMapSubscribed: subscriptionEntry.subscribed
+            });
+          }
+        });
+      }
+      
+      // DEBUG: Log the final subscription map
+      console.log('DEBUG - Final subscription map:', Array.from(subscriptionMap.entries()).map(([key, value]) => ({
+        pubkey: key,
+        pubkeyShort: key.substring(0, 8),
+        subscribed: value.subscribed,
+        timestamp: value.timestamp,
+        date: new Date(value.timestamp * 1000).toISOString()
+      })));
+      
       // Create member objects for all subscribed users
       const allMembers: Member[] = [];
+      
+      // DEBUG: Log moderators from currentTopic
+      console.log('DEBUG - Current topic moderators:', currentTopic?.moderators || []);
       
       // First add moderators with the moderator role
       if (currentTopic) {
         currentTopic.moderators.forEach(pubkey => {
+          console.log(`DEBUG - Adding moderator: ${pubkey.substring(0, 8)}...`);
           allMembers.push({
             pubkey,
             role: 'moderator' as MemberRole,
@@ -170,23 +293,141 @@ export default function MemberListPage({ topicId }: MemberListPageProps) {
       }
       
       // Then add all other subscribers with the member role
+      console.log('DEBUG - Processing subscription map for regular members...');
+      let skippedCount = 0;
+      let addedCount = 0;
+      
       subscriptionMap.forEach(({ subscribed, timestamp }, pubkey) => {
+        console.log(`DEBUG - Checking member: ${pubkey.substring(0, 8)}...`, {
+          subscribed,
+          timestamp,
+          isModerator: currentTopic?.moderators.includes(pubkey)
+        });
+        
         if (subscribed) {
           // Skip if already added as a moderator
           if (!currentTopic?.moderators.includes(pubkey)) {
+            console.log(`DEBUG - Adding regular member: ${pubkey.substring(0, 8)}...`);
             allMembers.push({
               pubkey,
               role: 'member' as MemberRole,
               joinedAt: timestamp,
               lastActive: timestamp
             });
+            addedCount++;
+          } else {
+            console.log(`DEBUG - Skipping member (already a moderator): ${pubkey.substring(0, 8)}...`);
+            skippedCount++;
+          }
+        } else {
+          console.log(`DEBUG - Skipping member (not subscribed): ${pubkey.substring(0, 8)}...`);
+          skippedCount++;
+        }
+      });
+      
+      // Double-check for any missing members in the original events
+      // This helps catch users who might have joined but whose subscription status
+      // wasn't properly tracked in the subscriptionMap
+      console.log('DEBUG - Double-checking for missing members in original events...');
+      const existingPubkeys = new Set(allMembers.map(member => member.pubkey));
+      
+      events.forEach((event: Event) => {
+        const pubkey = event.pubkey;
+        const timestamp = event.created_at;
+        
+        // If this pubkey isn't already in our members list and the event looks like a subscription
+        if (!existingPubkeys.has(pubkey) && !currentTopic?.moderators.includes(pubkey)) {
+          // Check if this looks like a subscription event (has 'e' tag for the topic)
+          const hasTopicTag = event.tags.some(tag => tag[0] === 'e' && tag[1] === topicId);
+          const actionTag = event.tags.find(tag => tag[0] === 'a');
+          const isSubscribeAction = !actionTag || actionTag[1] === 'subscribe';
+          
+          if (hasTopicTag && isSubscribeAction) {
+            console.log(`DEBUG - Found missing member in events: ${pubkey.substring(0, 8)}...`);
+            allMembers.push({
+              pubkey,
+              role: 'member' as MemberRole,
+              joinedAt: timestamp,
+              lastActive: timestamp
+            });
+            addedCount++;
           }
         }
       });
       
+      console.log(`DEBUG - Member processing summary: Added ${addedCount}, Skipped ${skippedCount}`);
       console.log('MemberListPage - Loaded members:', allMembers.length);
       
-      setMembers(allMembers);
+      // DEBUG: Log all members for verification with more details
+      console.log('DEBUG - All members:', allMembers.map(member => ({
+        pubkey: member.pubkey,
+        pubkeyShort: member.pubkey.substring(0, 8),
+        role: member.role,
+        joinedAt: member.joinedAt,
+        joinedDate: new Date(member.joinedAt * 1000).toISOString()
+      })));
+      
+      // Log subscription events for each member to help diagnose issues
+      console.log('DEBUG - Subscription events by member:');
+      allMembers.forEach(member => {
+        const memberEvents = events.filter(event => event.pubkey === member.pubkey);
+        console.log(`Member ${member.pubkey.substring(0, 8)} has ${memberEvents.length} events:`,
+          memberEvents.map(event => ({
+            id: event.id,
+            created_at: new Date(event.created_at * 1000).toISOString(),
+            tags: event.tags
+          }))
+        );
+      });
+      
+      // Log any subscription events for users not in the member list
+      const memberPubkeys = new Set(allMembers.map(member => member.pubkey));
+      const nonMemberEvents = events.filter(event => !memberPubkeys.has(event.pubkey));
+      if (nonMemberEvents.length > 0) {
+        console.log(`DEBUG - Found ${nonMemberEvents.length} events from users not in member list:`,
+          nonMemberEvents.map(event => ({
+            pubkey: event.pubkey,
+            pubkeyShort: event.pubkey.substring(0, 8),
+            id: event.id,
+            created_at: new Date(event.created_at * 1000).toISOString(),
+            tags: event.tags
+          }))
+        );
+      }
+      
+      // Merge with cached members to ensure consistency between page refreshes
+      // If a member exists in both lists, use the one from allMembers (newly fetched)
+      const mergedMembers: Member[] = [...cachedMembers];
+      
+      // Create a map of existing cached members by pubkey for quick lookup
+      const cachedMemberMap = new Map<string, Member>();
+      cachedMembers.forEach(member => {
+        cachedMemberMap.set(member.pubkey, member);
+      });
+      
+      // Add or update members from allMembers
+      allMembers.forEach(member => {
+        const existingIndex = mergedMembers.findIndex(m => m.pubkey === member.pubkey);
+        if (existingIndex >= 0) {
+          // Update existing member
+          mergedMembers[existingIndex] = member;
+        } else {
+          // Add new member
+          mergedMembers.push(member);
+        }
+      });
+      
+      console.log(`Final member count: ${mergedMembers.length} (${allMembers.length} from current fetch, ${cachedMembers.length} from cache)`);
+      
+      // Save to localStorage for next time
+      try {
+        localStorage.setItem(localStorageKey, JSON.stringify(mergedMembers));
+        console.log(`Saved ${mergedMembers.length} members to cache`);
+      } catch (e) {
+        console.error('Error saving members to cache:', e);
+      }
+      
+      setMembers(mergedMembers);
       setIsLoading(false);
     } catch (err) {
       console.error('Error fetching members:', err);
